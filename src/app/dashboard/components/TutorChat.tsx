@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Question } from '@/types/question';
 
@@ -15,18 +15,26 @@ interface TutorChatProps {
   question?: Question;
   userCode?: string;
   onQuestionGenerated?: (question: Question) => void;
+  onSubmissionStateChange?: (isSubmitting: boolean) => void;
 }
 
-export const TutorChat: React.FC<TutorChatProps> = ({ 
+export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, TutorChatProps>(({ 
   question, 
   userCode, 
-  onQuestionGenerated 
-}) => {
+  onQuestionGenerated,
+  onSubmissionStateChange
+}, ref) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    submitCode: (code: string) => {
+      handleCodeSubmission(code);
+    }
+  }));
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -36,6 +44,10 @@ export const TutorChat: React.FC<TutorChatProps> = ({
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    onSubmissionStateChange?.(isLoading);
+  }, [isLoading, onSubmissionStateChange]);
+
   const addMessage = (type: 'user' | 'tutor', content: string) => {
     const newMessage: Message = {
       id: Date.now().toString(),
@@ -44,6 +56,46 @@ export const TutorChat: React.FC<TutorChatProps> = ({
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, newMessage]);
+  };
+
+  const handleCodeSubmission = async (code: string) => {
+    addMessage('user', `Please review my code:\n\n\`\`\`python\n${code}\n\`\`\``);
+    setIsLoading(true);
+
+    try {
+      const context = question ? {
+        title: question.title,
+        description: question.description,
+        userCode: code,
+        difficulty: question.difficulty,
+        category: question.category
+      } : null;
+
+      const response = await fetch('/api/tutor', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: `Please review and provide feedback on my code solution for the problem "${question?.title}". Here's my code:\n\n${code}`,
+          context,
+          mode: 'review'
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        addMessage('tutor', data.data);
+      } else {
+        addMessage('tutor', 'Sorry, I encountered an error reviewing your code. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error submitting code to tutor:', error);
+      addMessage('tutor', 'Sorry, I encountered an error reviewing your code. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const sendMessage = async (message: string, mode: string = 'hint') => {
@@ -140,12 +192,6 @@ export const TutorChat: React.FC<TutorChatProps> = ({
     }
   };
 
-  const reviewCode = () => {
-    if (question && userCode) {
-      sendMessage('Please review my code and provide feedback.', 'review');
-    }
-  };
-
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
@@ -154,7 +200,7 @@ export const TutorChat: React.FC<TutorChatProps> = ({
           AI Tutor
         </h2>
         <p className="text-sm text-gray-600 mt-1">
-          Ask for hints, generate problems, or get help with your code
+          Get code feedback, hints, and generate new problems
         </p>
       </div>
 
@@ -187,16 +233,6 @@ export const TutorChat: React.FC<TutorChatProps> = ({
               >
                 Get Hint
               </Button>
-              {userCode && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={reviewCode}
-                  disabled={isLoading}
-                >
-                  Review Code
-                </Button>
-              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -215,7 +251,7 @@ export const TutorChat: React.FC<TutorChatProps> = ({
         {messages.length === 0 && (
           <div className="text-center text-gray-500 py-8">
             <p className="mb-2">👋 Hi! I&apos;m your AI coding tutor.</p>
-            <p className="text-sm">Ask me for hints, generate new problems, or get help with your code!</p>
+            <p className="text-sm">Write your code and click &quot;Get Feedback&quot; to submit it for review!</p>
           </div>
         )}
         
@@ -278,4 +314,6 @@ export const TutorChat: React.FC<TutorChatProps> = ({
       </div>
     </div>
   );
-}; 
+});
+
+TutorChat.displayName = 'TutorChat'; 

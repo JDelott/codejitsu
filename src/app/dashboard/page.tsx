@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { questions } from '@/lib/questions';
 import { Question } from '@/types/question';
@@ -12,6 +12,8 @@ export default function Dashboard() {
   const [selectedQuestion, setSelectedQuestion] = useState<Question>(questions[0]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [userCode, setUserCode] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const chatRef = useRef<{ submitCode: (code: string) => void }>(null);
 
   const handleQuestionGenerated = (question: Question) => {
     setSelectedQuestion(question);
@@ -19,6 +21,18 @@ export default function Dashboard() {
 
   const handleCodeChange = (code: string) => {
     setUserCode(code);
+  };
+
+  const handleCodeSubmit = async (code: string) => {
+    // Open chat if not already open
+    if (!isChatOpen) {
+      setIsChatOpen(true);
+      // Wait for chat to render before submitting
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    
+    // Submit code to chat
+    chatRef.current?.submitCode(code);
   };
 
   const handleQuestionSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -83,7 +97,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <h2 className="font-medium text-sm">{selectedQuestion.title}</h2>
               <span className="text-xs text-gray-500">
-                {selectedQuestion.category}
+                {selectedQuestion.category} • Click &quot;Get Feedback&quot; to submit your code for AI review
               </span>
             </div>
           </div>
@@ -91,7 +105,9 @@ export default function Dashboard() {
           {/* Code Editor - Takes All Remaining Space */}
           <CodeEditor 
             question={selectedQuestion} 
-            onCodeChange={handleCodeChange} 
+            onCodeChange={handleCodeChange}
+            onCodeSubmit={handleCodeSubmit}
+            isSubmitting={isSubmitting}
           />
         </div>
 
@@ -102,9 +118,11 @@ export default function Dashboard() {
           {isChatOpen && (
             <div className="w-96 h-full">
               <TutorChat
+                ref={chatRef}
                 question={selectedQuestion}
                 userCode={userCode}
                 onQuestionGenerated={handleQuestionGenerated}
+                onSubmissionStateChange={setIsSubmitting}
               />
             </div>
           )}

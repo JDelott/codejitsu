@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Question } from '@/types/question';
 import { Button } from '@/components/ui/Button';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -8,34 +8,30 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 interface CodeEditorProps {
   question: Question;
   onCodeChange?: (code: string) => void;
+  onCodeSubmit?: (code: string) => void;
+  isSubmitting?: boolean;
 }
 
-export const CodeEditor: React.FC<CodeEditorProps> = ({ question, onCodeChange }) => {
+export const CodeEditor: React.FC<CodeEditorProps> = ({ 
+  question, 
+  onCodeChange, 
+  onCodeSubmit,
+  isSubmitting = false
+}) => {
   const [code, setCode] = useLocalStorage(`code-${question.id}`, question.starter);
-  const [isRunning, setIsRunning] = useState(false);
-  const [output, setOutput] = useState('');
-  const [showOutput, setShowOutput] = useState(false);
 
   useEffect(() => {
     onCodeChange?.(code);
   }, [code, onCodeChange]);
 
-  const handleRunCode = async () => {
-    setIsRunning(true);
-    setOutput('Running code...');
-    setShowOutput(true);
-    
-    // Simulate code execution
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    setOutput(`Code executed successfully!\n\nNote: This is a demo. In a real implementation, this would:\n- Execute your Python code\n- Run test cases\n- Provide feedback on correctness and performance\n- Show execution time and memory usage`);
-    setIsRunning(false);
+  const handleCodeSubmit = () => {
+    if (code.trim()) {
+      onCodeSubmit?.(code);
+    }
   };
 
   const handleReset = () => {
     setCode(question.starter);
-    setOutput('');
-    setShowOutput(false);
   };
 
   return (
@@ -54,21 +50,12 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ question, onCodeChange }
             Reset
           </Button>
           <Button
-            onClick={handleRunCode}
-            disabled={isRunning}
+            onClick={handleCodeSubmit}
+            disabled={isSubmitting || !code.trim()}
             size="sm"
           >
-            {isRunning ? 'Running...' : 'Run Code'}
+            {isSubmitting ? 'Submitting...' : 'Get Feedback'}
           </Button>
-          {output && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowOutput(!showOutput)}
-            >
-              {showOutput ? 'Hide Output' : 'Show Output'}
-            </Button>
-          )}
         </div>
       </div>
 
@@ -83,27 +70,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ question, onCodeChange }
           style={{ fontSize: '14px', lineHeight: '1.5' }}
         />
       </div>
-
-      {/* Collapsible Output */}
-      {showOutput && output && (
-        <div className="border-t border-gray-200 bg-gray-50 max-h-48 overflow-y-auto">
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-medium text-sm">Output:</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowOutput(false)}
-              >
-                ×
-              </Button>
-            </div>
-            <pre className="font-[family-name:var(--font-geist-mono)] text-sm text-gray-700 whitespace-pre-wrap">
-              {output}
-            </pre>
-          </div>
-        </div>
-      )}
     </div>
   );
 }; 

@@ -5,6 +5,36 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+// Helper function to extract JSON from text response
+function extractJSON(text: string): Record<string, unknown> | null {
+  // Try to parse the entire text as JSON first
+  try {
+    return JSON.parse(text);
+  } catch {
+    // If that fails, try to find JSON in code blocks
+    const jsonBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+    if (jsonBlockMatch) {
+      try {
+        return JSON.parse(jsonBlockMatch[1]);
+      } catch {
+        // If code block parsing fails, continue to next method
+      }
+    }
+    
+    // Try to find JSON object in the text (look for { ... })
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[0]);
+      } catch {
+        // If this also fails, return null
+      }
+    }
+    
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { message, context, mode } = await request.json();
@@ -14,7 +44,10 @@ export async function POST(request: NextRequest) {
     switch (mode) {
       case 'generate':
         systemPrompt = `You are a coding interview tutor. Generate a coding problem based on the user's request. 
-        Return a JSON object with the following structure:
+        
+        IMPORTANT: Return ONLY a valid JSON object with no additional text or markdown formatting.
+        
+        Use this exact structure:
         {
           "title": "Problem Title",
           "difficulty": "Easy" | "Medium" | "Hard",
@@ -38,7 +71,7 @@ export async function POST(request: NextRequest) {
         Provide helpful hints and ask guiding questions without giving away the complete solution. 
         Be encouraging and educational. If they're stuck, guide them towards the right approach gradually.
         
-        Current problem context: ${context}`;
+        Current problem context: ${context ? JSON.stringify(context) : 'No context provided'}`;
         break;
         
       case 'review':
@@ -51,7 +84,7 @@ export async function POST(request: NextRequest) {
         
         Be encouraging and educational. Don't just say what's wrong, explain why and how to improve.
         
-        Current problem context: ${context}`;
+        Current problem context: ${context ? JSON.stringify(context) : 'No context provided'}`;
         break;
         
       case 'solution':
@@ -62,7 +95,7 @@ export async function POST(request: NextRequest) {
         - Time and space complexity analysis
         - Why this approach works
         
-        Current problem context: ${context}`;
+        Current problem context: ${context ? JSON.stringify(context) : 'No context provided'}`;
         break;
         
       default:
@@ -89,22 +122,24 @@ export async function POST(request: NextRequest) {
       responseText = content.text;
     }
 
-    // For generate mode, try to parse JSON
+    // For generate mode, extract and parse JSON
     if (mode === 'generate') {
-      try {
-        const parsedResponse = JSON.parse(responseText);
+      const parsedResponse = extractJSON(responseText);
+      
+      if (parsedResponse) {
         return NextResponse.json({ 
           success: true, 
           data: parsedResponse,
           raw: responseText 
         });
-      } catch {
-        // If JSON parsing fails, return as text
+      } else {
+        // If JSON extraction fails, return as text with error flag
         return NextResponse.json({ 
           success: true, 
           data: responseText,
           raw: responseText,
-          isText: true
+          isText: true,
+          error: 'Failed to parse JSON from response'
         });
       }
     }

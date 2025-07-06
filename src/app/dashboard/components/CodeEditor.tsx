@@ -14,6 +14,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ question, onCodeChange }
   const [code, setCode] = useLocalStorage(`code-${question.id}`, question.starter);
   const [isRunning, setIsRunning] = useState(false);
   const [output, setOutput] = useState('');
+  const [showOutput, setShowOutput] = useState(false);
 
   useEffect(() => {
     onCodeChange?.(code);
@@ -22,6 +23,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ question, onCodeChange }
   const handleRunCode = async () => {
     setIsRunning(true);
     setOutput('Running code...');
+    setShowOutput(true);
     
     // Simulate code execution
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -33,52 +35,75 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({ question, onCodeChange }
   const handleReset = () => {
     setCode(question.starter);
     setOutput('');
+    setShowOutput(false);
   };
 
   return (
-    <div className="flex-1 p-6 border-t border-gray-200">
-      <div className="h-full flex flex-col">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="font-[family-name:var(--font-geist-mono)] text-xs tracking-[0.15em] text-gray-500 uppercase">
-            Python Solution
-          </h2>
-          <div className="flex gap-2">
+    <div className="flex-1 flex flex-col h-full">
+      {/* Minimal Header */}
+      <div className="flex justify-between items-center px-4 py-2 border-b border-gray-200 bg-gray-50">
+        <span className="font-[family-name:var(--font-geist-mono)] text-xs tracking-[0.15em] text-gray-500 uppercase">
+          Python Solution
+        </span>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReset}
+          >
+            Reset
+          </Button>
+          <Button
+            onClick={handleRunCode}
+            disabled={isRunning}
+            size="sm"
+          >
+            {isRunning ? 'Running...' : 'Run Code'}
+          </Button>
+          {output && (
             <Button
               variant="outline"
               size="sm"
-              onClick={handleReset}
+              onClick={() => setShowOutput(!showOutput)}
             >
-              Reset
+              {showOutput ? 'Hide Output' : 'Show Output'}
             </Button>
-            <Button
-              onClick={handleRunCode}
-              disabled={isRunning}
-              size="sm"
-            >
-              {isRunning ? 'Running...' : 'Run Code'}
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex-1 flex flex-col min-h-0">
-          <textarea
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            className="flex-1 p-4 border border-gray-300 rounded font-[family-name:var(--font-geist-mono)] text-sm resize-none focus:outline-none focus:border-black"
-            placeholder="Write your Python solution here..."
-            spellCheck={false}
-          />
-
-          {output && (
-            <div className="mt-4 p-4 bg-gray-50 rounded border max-h-48 overflow-y-auto">
-              <h3 className="font-medium text-sm mb-2">Output:</h3>
-              <pre className="font-[family-name:var(--font-geist-mono)] text-sm text-gray-700 whitespace-pre-wrap">
-                {output}
-              </pre>
-            </div>
           )}
         </div>
       </div>
+
+      {/* Code Editor - Maximum Space */}
+      <div className="flex-1 relative">
+        <textarea
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          className="absolute inset-0 w-full h-full p-4 border-0 font-[family-name:var(--font-geist-mono)] text-sm resize-none focus:outline-none bg-white"
+          placeholder="Write your Python solution here..."
+          spellCheck={false}
+          style={{ fontSize: '14px', lineHeight: '1.5' }}
+        />
+      </div>
+
+      {/* Collapsible Output */}
+      {showOutput && output && (
+        <div className="border-t border-gray-200 bg-gray-50 max-h-48 overflow-y-auto">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-medium text-sm">Output:</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowOutput(false)}
+              >
+                ×
+              </Button>
+            </div>
+            <pre className="font-[family-name:var(--font-geist-mono)] text-sm text-gray-700 whitespace-pre-wrap">
+              {output}
+            </pre>
+          </div>
+        </div>
+      )}
     </div>
   );
 }; 

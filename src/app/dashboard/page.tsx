@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [userCode, setUserCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resetTrigger, setResetTrigger] = useState(0);
   const chatRef = useRef<{ submitCode: (code: string) => void }>(null);
 
   const handleQuestionGenerated = (question: Question) => {
@@ -34,6 +35,12 @@ export default function Dashboard() {
     chatRef.current?.submitCode(code);
   };
 
+  const handleGetFeedback = () => {
+    if (userCode.trim()) {
+      handleCodeSubmit(userCode);
+    }
+  };
+
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case 'Easy': return 'bg-green-100 text-green-800';
@@ -43,25 +50,52 @@ export default function Dashboard() {
     }
   };
 
+  const handleReset = () => {
+    setResetTrigger(prev => prev + 1);
+  };
+
   return (
     <div className="min-h-screen bg-white text-black">
-      {/* Compact Header */}
-      <nav className="flex justify-between items-center px-4 py-2 border-b border-gray-200">
+      {/* Header with all controls */}
+      <nav className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
         <Link href="/" className="font-[family-name:var(--font-geist-mono)] text-sm font-medium tracking-[0.2em] hover:text-gray-600 transition-colors">
           ← CODEJITSU
         </Link>
         
-        {/* Problem Info & Selector */}
+        {/* Center section - Problem info */}
         <div className="flex items-center gap-4">
           {selectedQuestion && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">{selectedQuestion.title}</span>
-              <span className={`px-2 py-1 rounded text-xs font-medium ${getDifficultyColor(selectedQuestion.difficulty)}`}>
+            <>
+              <span className="text-lg font-semibold">{selectedQuestion.title}</span>
+              <span className={`px-3 py-1 rounded text-sm font-medium ${getDifficultyColor(selectedQuestion.difficulty)}`}>
                 {selectedQuestion.difficulty}
               </span>
-            </div>
+              <span className="px-3 py-1 rounded text-sm bg-gray-100 text-gray-700">
+                {selectedQuestion.category}
+              </span>
+            </>
           )}
-          
+          {!selectedQuestion && (
+            <span className="text-lg font-semibold text-gray-400">No Problem Selected</span>
+          )}
+        </div>
+        
+        {/* Right section - Action buttons */}
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReset}
+          >
+            {selectedQuestion ? 'Reset' : 'Clear'}
+          </Button>
+          <Button
+            onClick={handleGetFeedback}
+            disabled={isSubmitting || !userCode.trim()}
+            size="sm"
+          >
+            {isSubmitting ? 'Submitting...' : 'Get Feedback'}
+          </Button>
           <Button
             size="sm"
             variant={isChatOpen ? "primary" : "outline"}
@@ -72,37 +106,20 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      <div className="flex h-[calc(100vh-57px)]">
-        {/* Main Content Area - Maximum Space */}
+      <div className="flex h-[calc(100vh-73px)]">
+        {/* Main Content Area - Centered */}
         <div className="flex-1 flex flex-col">
-          {/* Problem Description or Welcome Message */}
-          {selectedQuestion ? (
-            <div className="px-4 py-2 border-b border-gray-200 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <h2 className="font-medium text-sm">{selectedQuestion.title}</h2>
-                <span className="text-xs text-gray-500">
-                  {selectedQuestion.category} • Click &quot;Get Feedback&quot; to submit your code for AI review
-                </span>
-              </div>
+          {/* Code Editor Container - Centered */}
+          <div className="flex-1 flex justify-center">
+            <div className="w-full max-w-5xl">
+              <CodeEditor 
+                question={selectedQuestion} 
+                onCodeChange={handleCodeChange}
+                isSubmitting={isSubmitting}
+                resetTrigger={resetTrigger}
+              />
             </div>
-          ) : (
-            <div className="px-4 py-2 border-b border-gray-200 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <h2 className="font-medium text-sm">Welcome to CodeJitsu</h2>
-                <span className="text-xs text-gray-500">
-                  Open AI Tutor to generate coding problems and get started
-                </span>
-              </div>
-            </div>
-          )}
-          
-          {/* Code Editor - Takes All Remaining Space */}
-          <CodeEditor 
-            question={selectedQuestion} 
-            onCodeChange={handleCodeChange}
-            onCodeSubmit={handleCodeSubmit}
-            isSubmitting={isSubmitting}
-          />
+          </div>
         </div>
 
         {/* Collapsible Chat Panel */}

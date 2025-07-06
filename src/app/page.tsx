@@ -1,5 +1,8 @@
 'use client'
 
+import Link from 'next/link'
+import { Button } from '@/components/ui/Button'
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-white text-black">
@@ -34,12 +37,14 @@ export default function Home() {
               
               {/* CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-4 max-w-md">
-                <button className="bg-black text-white px-8 py-4 font-medium tracking-wide hover:bg-gray-900 transition-colors">
-                  START LEARNING
-                </button>
-                <button className="border border-black text-black px-8 py-4 font-medium tracking-wide hover:bg-black hover:text-white transition-colors">
+                <Link href="/dashboard">
+                  <Button className="w-full sm:w-auto tracking-wide">
+                    START LEARNING
+                  </Button>
+                </Link>
+                <Button variant="outline" className="w-full sm:w-auto tracking-wide">
                   VIEW DEMO
-                </button>
+                </Button>
               </div>
             </div>
             

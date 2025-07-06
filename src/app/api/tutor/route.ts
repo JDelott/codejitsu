@@ -1,0 +1,124 @@
+import { NextRequest, NextResponse } from 'next/server';
+import Anthropic from '@anthropic-ai/sdk';
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+export async function POST(request: NextRequest) {
+  try {
+    const { message, context, mode } = await request.json();
+
+    let systemPrompt = '';
+    
+    switch (mode) {
+      case 'generate':
+        systemPrompt = `You are a coding interview tutor. Generate a coding problem based on the user's request. 
+        Return a JSON object with the following structure:
+        {
+          "title": "Problem Title",
+          "difficulty": "Easy" | "Medium" | "Hard",
+          "category": "Arrays" | "Stack" | "Trees" | "Linked Lists" | "Dynamic Programming" | "Graphs" | "Strings",
+          "description": "Problem description",
+          "examples": [
+            {
+              "input": "example input",
+              "output": "example output", 
+              "explanation": "explanation of the example"
+            }
+          ],
+          "constraints": ["constraint 1", "constraint 2"],
+          "starter": "Python function starter code with docstring",
+          "hints": ["hint 1", "hint 2", "hint 3"]
+        }`;
+        break;
+        
+      case 'hint':
+        systemPrompt = `You are a coding tutor. The user is working on a coding problem and needs guidance. 
+        Provide helpful hints and ask guiding questions without giving away the complete solution. 
+        Be encouraging and educational. If they're stuck, guide them towards the right approach gradually.
+        
+        Current problem context: ${context}`;
+        break;
+        
+      case 'review':
+        systemPrompt = `You are a coding tutor reviewing the user's code. 
+        Provide constructive feedback on their solution. Point out:
+        - Correctness issues
+        - Time/space complexity
+        - Code quality and style
+        - Alternative approaches
+        
+        Be encouraging and educational. Don't just say what's wrong, explain why and how to improve.
+        
+        Current problem context: ${context}`;
+        break;
+        
+      case 'solution':
+        systemPrompt = `You are a coding tutor. The user has requested the solution to their problem.
+        Provide a complete, well-explained solution with:
+        - Clean, readable code
+        - Step-by-step explanation
+        - Time and space complexity analysis
+        - Why this approach works
+        
+        Current problem context: ${context}`;
+        break;
+        
+      default:
+        systemPrompt = `You are a helpful coding tutor. Assist the user with their coding questions while being encouraging and educational.`;
+    }
+
+    const response = await anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 2000,
+      temperature: 0.7,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: message,
+        },
+      ],
+    });
+
+    const content = response.content[0];
+    let responseText = '';
+    
+    if (content.type === 'text') {
+      responseText = content.text;
+    }
+
+    // For generate mode, try to parse JSON
+    if (mode === 'generate') {
+      try {
+        const parsedResponse = JSON.parse(responseText);
+        return NextResponse.json({ 
+          success: true, 
+          data: parsedResponse,
+          raw: responseText 
+        });
+      } catch {
+        // If JSON parsing fails, return as text
+        return NextResponse.json({ 
+          success: true, 
+          data: responseText,
+          raw: responseText,
+          isText: true
+        });
+      }
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      data: responseText 
+    });
+
+  } catch (error) {
+    console.error('Claude API Error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to get response from Claude' },
+      { status: 500 }
+    );
+  }
+}

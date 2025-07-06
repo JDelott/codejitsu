@@ -7,10 +7,14 @@ import { Question } from '@/types/question';
 import { QuestionSidebar } from './components/QuestionSidebar';
 import { QuestionDetail } from './components/QuestionDetail';
 import { CodeEditor } from './components/CodeEditor';
+import { TutorChat } from './components/TutorChat';
+import { Button } from '@/components/ui/Button';
 
 export default function Dashboard() {
   const [selectedQuestion, setSelectedQuestion] = useState<Question>(questions[0]);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [showTutor, setShowTutor] = useState(false);
+  const [userCode, setUserCode] = useState('');
 
   const handleQuestionSelect = (question: Question) => {
     setSelectedQuestion(question);
@@ -18,6 +22,15 @@ export default function Dashboard() {
 
   const handleCategorySelect = (category: string) => {
     setSelectedCategory(category);
+  };
+
+  const handleQuestionGenerated = (question: Question) => {
+    setSelectedQuestion(question);
+    setShowTutor(false); // Switch back to problem view
+  };
+
+  const handleCodeChange = (code: string) => {
+    setUserCode(code);
   };
 
   return (
@@ -38,6 +51,13 @@ export default function Dashboard() {
             <span className="px-2 py-1 bg-green-100 rounded text-green-700">
               Streak: 0
             </span>
+            <Button
+              size="sm"
+              variant={showTutor ? "primary" : "outline"}
+              onClick={() => setShowTutor(!showTutor)}
+            >
+              {showTutor ? 'Hide Tutor' : 'AI Tutor'}
+            </Button>
           </div>
         </div>
       </nav>
@@ -59,8 +79,19 @@ export default function Dashboard() {
           <QuestionDetail question={selectedQuestion} />
           
           {/* Code Editor */}
-          <CodeEditor question={selectedQuestion} />
+          <CodeEditor question={selectedQuestion} onCodeChange={handleCodeChange} />
         </div>
+
+        {/* Tutor Panel */}
+        {showTutor && (
+          <div className="w-96 border-l border-gray-200">
+            <TutorChat
+              question={selectedQuestion}
+              userCode={userCode}
+              onQuestionGenerated={handleQuestionGenerated}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

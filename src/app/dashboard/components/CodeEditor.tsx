@@ -1,18 +1,23 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Question } from '@/types/question';
 import { Button } from '@/components/ui/Button';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 interface CodeEditorProps {
   question: Question;
+  onCodeChange?: (code: string) => void;
 }
 
-export const CodeEditor: React.FC<CodeEditorProps> = ({ question }) => {
+export const CodeEditor: React.FC<CodeEditorProps> = ({ question, onCodeChange }) => {
   const [code, setCode] = useLocalStorage(`code-${question.id}`, question.starter);
   const [isRunning, setIsRunning] = useState(false);
   const [output, setOutput] = useState('');
+
+  useEffect(() => {
+    onCodeChange?.(code);
+  }, [code, onCodeChange]);
 
   const handleRunCode = async () => {
     setIsRunning(true);

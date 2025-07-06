@@ -9,10 +9,11 @@ interface Message {
   type: 'user' | 'tutor';
   content: string;
   timestamp: Date;
+  question?: Question;
 }
 
 interface TutorChatProps {
-  question?: Question;
+  question?: Question | null;
   userCode?: string;
   onQuestionGenerated?: (question: Question) => void;
   onSubmissionStateChange?: (isSubmitting: boolean) => void;
@@ -48,12 +49,13 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
     onSubmissionStateChange?.(isLoading);
   }, [isLoading, onSubmissionStateChange]);
 
-  const addMessage = (type: 'user' | 'tutor', content: string) => {
+  const addMessage = (type: 'user' | 'tutor', content: string, questionData?: Question) => {
     const newMessage: Message = {
       id: Date.now().toString(),
       type,
       content,
       timestamp: new Date(),
+      question: questionData
     };
     setMessages(prev => [...prev, newMessage]);
   };
@@ -173,8 +175,27 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
           ...data.data
         };
         
-        onQuestionGenerated?.(generatedQuestion);
-        addMessage('tutor', `I've generated a new ${generatedQuestion.difficulty} problem about ${generatedQuestion.category}: "${generatedQuestion.title}". Good luck solving it!`);
+        const problemContent = `🎯 **${generatedQuestion.title}** (${generatedQuestion.difficulty})
+
+**Category:** ${generatedQuestion.category}
+
+**Description:**
+${generatedQuestion.description}
+
+**Examples:**
+${generatedQuestion.examples.map((ex, i) => `
+Example ${i + 1}:
+Input: ${ex.input}
+Output: ${ex.output}
+Explanation: ${ex.explanation}`).join('\n')}
+
+**Constraints:**
+${generatedQuestion.constraints.map(c => `• ${c}`).join('\n')}
+
+**Hints:**
+${generatedQuestion.hints?.map((hint, i) => `${i + 1}. ${hint}`).join('\n') || 'No hints provided.'}`;
+
+        addMessage('tutor', problemContent, generatedQuestion);
       } else {
         addMessage('tutor', data.data);
       }
@@ -186,11 +207,63 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
     }
   };
 
-  const requestSolution = () => {
-    if (question) {
-      sendMessage('Please provide the complete solution with explanation.', 'solution');
+  const applyQuestionToEditor = (questionData: Question) => {
+    onQuestionGenerated?.(questionData);
+  };
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'Easy': return 'bg-green-100 text-green-800';
+      case 'Medium': return 'bg-yellow-100 text-yellow-800';
+      case 'Hard': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
+
+  const getHint = () => {
+    if (question) {
+      sendMessage(`Can you give me a hint for the problem "${question.title}"? I'm working on a ${question.difficulty} ${question.category} problem.`, 'hint');
+    }
+  };
+
+  const requestSolution = () => {
+    if (question) {
+      sendMessage(`Please provide the complete solution with detailed explanation for the problem "${question.title}".`, 'solution');
+    }
+  };
+
+  const problemGenerators = [
+    {
+      label: "Array Problem",
+      prompt: "Generate a medium-difficulty array manipulation problem similar to Two Sum or Maximum Subarray. Include multiple test cases and focus on time/space complexity optimization.",
+      difficulty: "Medium"
+    },
+    {
+      label: "Tree Problem", 
+      prompt: "Generate an easy-to-medium binary tree problem involving traversal, searching, or tree modification. Include examples with different tree structures.",
+      difficulty: "Easy-Medium"
+    },
+    {
+      label: "Dynamic Programming",
+      prompt: "Generate a medium-difficulty dynamic programming problem with overlapping subproblems. Include examples showing the optimal substructure property.",
+      difficulty: "Medium"
+    },
+    {
+      label: "Stack Problem",
+      prompt: "Generate an easy-to-medium stack-based problem like parentheses matching or expression evaluation. Include edge cases and examples.",
+      difficulty: "Easy-Medium"
+    },
+    {
+      label: "Linked List Problem",
+      prompt: "Generate a medium-difficulty linked list problem involving manipulation like reversal, cycle detection, or merging. Include visualization examples.",
+      difficulty: "Medium"
+    },
+    {
+      label: "String Problem",
+      prompt: "Generate a medium-difficulty string manipulation problem involving pattern matching, substring operations, or string transformations.",
+      difficulty: "Medium"
+    }
+  ];
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -200,48 +273,57 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
           AI Tutor
         </h2>
         <p className="text-sm text-gray-600 mt-1">
-          Get code feedback, hints, and generate new problems
+          Get code feedback, hints, and generate coding problems
         </p>
       </div>
 
       {/* Quick Actions */}
       <div className="p-4 border-b border-gray-200">
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => generateQuestion('Generate an easy array problem')}
-            disabled={isGenerating}
-          >
-            {isGenerating ? 'Generating...' : 'Generate Easy Problem'}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => generateQuestion('Generate a medium dynamic programming problem')}
-            disabled={isGenerating}
-          >
-            Generate Medium Problem
-          </Button>
+        <div className="space-y-3">
+          {/* Problem Generation */}
+          <div>
+            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Generate Problems</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {problemGenerators.map((gen, index) => (
+                <Button
+                  key={index}
+                  size="sm"
+                  variant="outline"
+                  onClick={() => generateQuestion(gen.prompt)}
+                  disabled={isGenerating}
+                  className="text-xs"
+                >
+                  {gen.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Current Problem Actions */}
           {question && (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => sendMessage('Can you give me a hint for this problem?')}
-                disabled={isLoading}
-              >
-                Get Hint
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={requestSolution}
-                disabled={isLoading}
-              >
-                Show Solution
-              </Button>
-            </>
+            <div>
+              <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Current Problem</h3>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={getHint}
+                  disabled={isLoading}
+                  className="text-xs"
+                >
+                  💡 Get Hint
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={requestSolution}
+                  disabled={isLoading}
+                  className="text-xs"
+                >
+                  ✅ Show Solution
+                </Button>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -251,7 +333,13 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
         {messages.length === 0 && (
           <div className="text-center text-gray-500 py-8">
             <p className="mb-2">👋 Hi! I&apos;m your AI coding tutor.</p>
-            <p className="text-sm">Write your code and click &quot;Get Feedback&quot; to submit it for review!</p>
+            <p className="text-sm mb-4">I can help you with:</p>
+            <ul className="text-sm space-y-1 text-left max-w-xs mx-auto">
+              <li>• Generate coding problems by type</li>
+              <li>• Review and debug your code</li>
+              <li>• Provide hints and explanations</li>
+              <li>• Show complete solutions</li>
+            </ul>
           </div>
         )}
         
@@ -261,7 +349,7 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
             className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] p-3 rounded-lg ${
+              className={`max-w-[90%] p-3 rounded-lg ${
                 message.type === 'user'
                   ? 'bg-black text-white'
                   : 'bg-gray-100 text-gray-800'
@@ -270,6 +358,27 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
               <div className="whitespace-pre-wrap break-words">
                 {message.content}
               </div>
+              
+              {message.question && (
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${getDifficultyColor(message.question.difficulty)}`}>
+                      {message.question.difficulty}
+                    </span>
+                    <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-700">
+                      {message.question.category}
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => applyQuestionToEditor(message.question!)}
+                    className="mt-2 w-full"
+                  >
+                     Apply to Editor
+                  </Button>
+                </div>
+              )}
+              
               <div className="text-xs opacity-70 mt-1">
                 {message.timestamp.toLocaleTimeString()}
               </div>
@@ -277,7 +386,7 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
           </div>
         ))}
         
-        {isLoading && (
+        {(isLoading || isGenerating) && (
           <div className="flex justify-start">
             <div className="bg-gray-100 text-gray-800 p-3 rounded-lg">
               <div className="flex items-center gap-2">

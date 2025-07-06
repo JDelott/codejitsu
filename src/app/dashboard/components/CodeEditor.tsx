@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 interface CodeEditorProps {
-  question: Question;
+  question: Question | null;
   onCodeChange?: (code: string) => void;
   onCodeSubmit?: (code: string) => void;
   isSubmitting?: boolean;
@@ -18,7 +18,16 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onCodeSubmit,
   isSubmitting = false
 }) => {
-  const [code, setCode] = useLocalStorage(`code-${question.id}`, question.starter);
+  const [code, setCode] = useLocalStorage(
+    question ? `code-${question.id}` : 'code-blank', 
+    question?.starter || '# Write your Python code here\n\n'
+  );
+
+  useEffect(() => {
+    if (question) {
+      setCode(question.starter);
+    }
+  }, [question, setCode]);
 
   useEffect(() => {
     onCodeChange?.(code);
@@ -31,7 +40,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   };
 
   const handleReset = () => {
-    setCode(question.starter);
+    if (question) {
+      setCode(question.starter);
+    } else {
+      setCode('# Write your Python code here\n\n');
+    }
   };
 
   return (
@@ -39,7 +52,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       {/* Minimal Header */}
       <div className="flex justify-between items-center px-4 py-2 border-b border-gray-200 bg-gray-50">
         <span className="font-[family-name:var(--font-geist-mono)] text-xs tracking-[0.15em] text-gray-500 uppercase">
-          Python Solution
+          {question ? `${question.title} - Python Solution` : 'Python Editor'}
         </span>
         <div className="flex gap-2">
           <Button
@@ -47,7 +60,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             size="sm"
             onClick={handleReset}
           >
-            Reset
+            {question ? 'Reset' : 'Clear'}
           </Button>
           <Button
             onClick={handleCodeSubmit}
@@ -65,7 +78,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           value={code}
           onChange={(e) => setCode(e.target.value)}
           className="absolute inset-0 w-full h-full p-4 border-0 font-[family-name:var(--font-geist-mono)] text-sm resize-none focus:outline-none bg-white"
-          placeholder="Write your Python solution here..."
+          placeholder="Start coding! Open AI Tutor to generate problems or write your own Python code..."
           spellCheck={false}
           style={{ fontSize: '14px', lineHeight: '1.5' }}
         />

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.56.0",
+    "@vapi-ai/web": "^2.3.8",
     "next": "15.3.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

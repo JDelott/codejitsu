@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Question } from '@/types/question';
+import { useVapi } from '@/hooks/useVapi';
 
 interface Message {
   id: string;
@@ -30,6 +31,8 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const { startCall, endCall, isCallActive, isLoading: isVapiLoading, error: vapiError, transcript } = useVapi();
 
   useImperativeHandle(ref, () => ({
     submitCode: (code: string) => {
@@ -325,6 +328,57 @@ ${generatedQuestion.hints?.map((hint, i) => `${i + 1}. ${hint}`).join('\n') || '
               </div>
             </div>
           )}
+
+          {/* Voice Chat Section */}
+          <div>
+            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Voice Tutor</h3>
+            <div className="space-y-2">
+              {!isCallActive ? (
+                <Button
+                  size="sm"
+                  onClick={startCall}
+                  disabled={isVapiLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isVapiLoading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                      Connecting...
+                    </div>
+                  ) : (
+                    <>🎤 Start Voice Chat</>
+                  )}
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm text-green-700 font-medium">Voice Chat Active</span>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={endCall}
+                    className="w-full border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    🔴 End Voice Chat
+                  </Button>
+                  {transcript && (
+                    <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded border">
+                      <span className="font-medium">You said:</span> {transcript}
+                    </div>
+                  )}
+                </div>
+              )}
+              {vapiError && (
+                <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                  ⚠️ {vapiError}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

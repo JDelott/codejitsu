@@ -32,7 +32,10 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
   const [isGenerating, setIsGenerating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { startCall, endCall, isCallActive, isLoading: isVapiLoading, error: vapiError, transcript } = useVapi();
+  const { startCall, endCall, injectContext, isCallActive, isLoading: isVapiLoading, error: vapiError, transcript } = useVapi();
+
+  // Add state to track the conversation flow
+  const [conversationState, setConversationState] = useState<'welcome' | 'discovery' | 'skill-assessment' | 'problem-working'>('welcome');
 
   useImperativeHandle(ref, () => ({
     submitCode: (code: string) => {
@@ -103,10 +106,133 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
     }
   };
 
+  // Update the functions to actually be used
+  const startProblemDiscovery = () => {
+    setConversationState('discovery');
+    addMessage('tutor', `👋 Hi! I'm here to help you practice coding. Let's find the perfect problem for you!
+
+What would you like to work on today?
+• **Interview prep** - Classic problems like Two Sum, Binary Search
+• **Algorithms** - Sorting, searching, graph problems  
+• **Data structures** - Arrays, trees, linked lists
+• **Specific topic** - Tell me what you want to practice
+
+Just tell me what interests you or what you're preparing for!`);
+  };
+
+  // Make assessSkillLevel actually get called
+  const handleTopicSelection = (message: string) => {
+    if (conversationState === 'discovery') {
+      setConversationState('skill-assessment');
+      assessSkillLevel(message);
+    }
+  };
+
+  const assessSkillLevel = (topic: string) => {
+    addMessage('tutor', `Great choice on ${topic}! 
+
+To give you the right challenge, how comfortable are you with this topic?
+• **Beginner** - New to this, need fundamentals
+• **Intermediate** - Know basics, want to practice
+• **Advanced** - Looking for challenging problems
+
+Or describe your experience level in your own words!`);
+  };
+
+  // Update generateQuestion to use presentProblem
+  const generateQuestion = async (prompt: string) => {
+    setIsGenerating(true);
+    addMessage('user', `Generate a question: ${prompt}`);
+
+    try {
+      const response = await fetch('/api/tutor', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: prompt,
+          context: null,
+          mode: 'generate'
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && !data.isText) {
+        const generatedQuestion: Question = {
+          id: Date.now(),
+          ...data.data
+        };
+        
+        // Use presentProblem instead of the old format
+        presentProblem(generatedQuestion);
+        setConversationState('problem-working');
+        
+      } else {
+        addMessage('tutor', data.data);
+      }
+    } catch (error) {
+      console.error('Error generating question:', error);
+      addMessage('tutor', 'Sorry, I encountered an error generating the question.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const presentProblem = (question: Question) => {
+    const problemIntro = `🎯 **${question.title}** (${question.difficulty})
+
+Let's break this down together:
+
+**What we're trying to solve:**
+${question.description}
+
+**Example to get us started:**
+${question.examples[0] ? `
+Input: ${question.examples[0].input}
+Output: ${question.examples[0].output}
+Why: ${question.examples[0].explanation}
+` : ''}
+
+**Before we code, let's think:**
+1. What's the core problem we're solving?
+2. What approach comes to mind first?
+3. Are there any edge cases to consider?
+
+Take your time to understand it, then tell me your initial thoughts!`;
+
+    addMessage('tutor', problemIntro, question);
+  };
+
+  // Update sendMessage to handle conversation states
   const sendMessage = async (message: string, mode: string = 'hint') => {
     if (!message.trim()) return;
 
     addMessage('user', message);
+    
+    // Handle conversation flow
+    if (conversationState === 'discovery') {
+      handleTopicSelection(message);
+      return;
+    }
+    
+    if (conversationState === 'skill-assessment') {
+      // Generate appropriate problem based on skill level
+      const skillLevel = message.toLowerCase();
+      let difficulty = 'Medium';
+      if (skillLevel.includes('beginner') || skillLevel.includes('new')) {
+        difficulty = 'Easy';
+      } else if (skillLevel.includes('advanced') || skillLevel.includes('expert')) {
+        difficulty = 'Hard';
+      }
+      
+      const prompt = `Generate a ${difficulty} difficulty coding problem for someone with ${message} experience level.`;
+      generateQuestion(prompt);
+      return;
+    }
+
+    // Continue with existing sendMessage logic for problem-working state
     setIsLoading(true);
 
     try {
@@ -153,63 +279,6 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
     }
   };
 
-  const generateQuestion = async (prompt: string) => {
-    setIsGenerating(true);
-    addMessage('user', `Generate a question: ${prompt}`);
-
-    try {
-      const response = await fetch('/api/tutor', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: prompt,
-          context: null,
-          mode: 'generate'
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success && !data.isText) {
-        const generatedQuestion: Question = {
-          id: Date.now(), // Temporary ID
-          ...data.data
-        };
-        
-        const problemContent = `🎯 **${generatedQuestion.title}** (${generatedQuestion.difficulty})
-
-**Category:** ${generatedQuestion.category}
-
-**Description:**
-${generatedQuestion.description}
-
-**Examples:**
-${generatedQuestion.examples.map((ex, i) => `
-Example ${i + 1}:
-Input: ${ex.input}
-Output: ${ex.output}
-Explanation: ${ex.explanation}`).join('\n')}
-
-**Constraints:**
-${generatedQuestion.constraints.map(c => `• ${c}`).join('\n')}
-
-**Hints:**
-${generatedQuestion.hints?.map((hint, i) => `${i + 1}. ${hint}`).join('\n') || 'No hints provided.'}`;
-
-        addMessage('tutor', problemContent, generatedQuestion);
-      } else {
-        addMessage('tutor', data.data);
-      }
-    } catch (error) {
-      console.error('Error generating question:', error);
-      addMessage('tutor', 'Sorry, I encountered an error generating the question.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
   const applyQuestionToEditor = (questionData: Question) => {
     onQuestionGenerated?.(questionData);
   };
@@ -235,38 +304,32 @@ ${generatedQuestion.hints?.map((hint, i) => `${i + 1}. ${hint}`).join('\n') || '
     }
   };
 
-  const problemGenerators = [
-    {
-      label: "Array Problem",
-      prompt: "Generate a medium-difficulty array manipulation problem similar to Two Sum or Maximum Subarray. Include multiple test cases and focus on time/space complexity optimization.",
-      difficulty: "Medium"
-    },
-    {
-      label: "Tree Problem", 
-      prompt: "Generate an easy-to-medium binary tree problem involving traversal, searching, or tree modification. Include examples with different tree structures.",
-      difficulty: "Easy-Medium"
-    },
-    {
-      label: "Dynamic Programming",
-      prompt: "Generate a medium-difficulty dynamic programming problem with overlapping subproblems. Include examples showing the optimal substructure property.",
-      difficulty: "Medium"
-    },
-    {
-      label: "Stack Problem",
-      prompt: "Generate an easy-to-medium stack-based problem like parentheses matching or expression evaluation. Include edge cases and examples.",
-      difficulty: "Easy-Medium"
-    },
-    {
-      label: "Linked List Problem",
-      prompt: "Generate a medium-difficulty linked list problem involving manipulation like reversal, cycle detection, or merging. Include visualization examples.",
-      difficulty: "Medium"
-    },
-    {
-      label: "String Problem",
-      prompt: "Generate a medium-difficulty string manipulation problem involving pattern matching, substring operations, or string transformations.",
-      difficulty: "Medium"
+  // Enhanced call handlers for different modes
+  const handleStartHintCall = () => {
+    startCall(question, userCode, 'hint');
+  };
+
+  const handleStartReviewCall = () => {
+    startCall(question, userCode, 'review');
+  };
+
+  const handleStartSolutionCall = () => {
+    startCall(question, userCode, 'solution');
+  };
+
+  // Inject code context during call
+  const injectCodeContext = () => {
+    if (userCode && isCallActive) {
+      injectContext(`Here's my current code:\n\n\`\`\`python\n${userCode}\n\`\`\``);
     }
-  ];
+  };
+
+  // Inject problem context during call
+  const injectProblemContext = () => {
+    if (question && isCallActive) {
+      injectContext(`I'm working on: ${question.title}\n\nDescription: ${question.description}`);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -287,18 +350,15 @@ ${generatedQuestion.hints?.map((hint, i) => `${i + 1}. ${hint}`).join('\n') || '
           <div>
             <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Generate Problems</h3>
             <div className="grid grid-cols-2 gap-2">
-              {problemGenerators.map((gen, index) => (
-                <Button
-                  key={index}
-                  size="sm"
-                  variant="outline"
-                  onClick={() => generateQuestion(gen.prompt)}
-                  disabled={isGenerating}
-                  className="text-xs"
-                >
-                  {gen.label}
-                </Button>
-              ))}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={startProblemDiscovery}
+                disabled={isGenerating}
+                className="text-xs"
+              >
+                👋 Start Problem Discovery
+              </Button>
             </div>
           </div>
 
@@ -334,44 +394,68 @@ ${generatedQuestion.hints?.map((hint, i) => `${i + 1}. ${hint}`).join('\n') || '
             <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Voice Tutor</h3>
             <div className="space-y-2">
               {!isCallActive ? (
-                <Button
-                  size="sm"
-                  onClick={startCall}
-                  disabled={isVapiLoading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  {isVapiLoading ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
-                      Connecting...
-                    </div>
-                  ) : (
-                    <>🎤 Start Voice Chat</>
-                  )}
-                </Button>
+                <div className="space-y-2">
+                  <Button 
+                    size="sm" 
+                    onClick={handleStartHintCall} 
+                    className="w-full"
+                    disabled={isVapiLoading}
+                  >
+                    {isVapiLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                        Connecting...
+                      </div>
+                    ) : (
+                      <>🎤 Get Hints</>
+                    )}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    onClick={handleStartReviewCall} 
+                    className="w-full"
+                    disabled={isVapiLoading}
+                  >
+                    🎤 Review Code
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    onClick={handleStartSolutionCall} 
+                    className="w-full"
+                    disabled={isVapiLoading}
+                  >
+                    🎤 Get Solution
+                  </Button>
+                </div>
               ) : (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-center p-3 bg-green-50 rounded-lg border border-green-200">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-sm text-green-700 font-medium">Voice Chat Active</span>
-                    </div>
+                  <div className="flex items-center justify-center p-3 bg-green-50 rounded-lg">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="ml-2 text-sm text-green-700">Voice Chat Active</span>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={endCall}
-                    className="w-full border-red-200 text-red-600 hover:bg-red-50"
-                  >
-                    🔴 End Voice Chat
+                  
+                  <div className="flex space-x-2">
+                    <Button size="sm" onClick={injectCodeContext} className="flex-1">
+                      📝 Share Code
+                    </Button>
+                    <Button size="sm" onClick={injectProblemContext} className="flex-1">
+                      📋 Share Problem
+                    </Button>
+                  </div>
+                  
+                  <Button size="sm" variant="outline" onClick={endCall} className="w-full">
+                    🔴 End Call
                   </Button>
-                  {transcript && (
-                    <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded border">
-                      <span className="font-medium">You said:</span> {transcript}
-                    </div>
-                  )}
                 </div>
               )}
+              
+              {/* Show transcript when available */}
+              {transcript && (
+                <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded border">
+                  <span className="font-medium">You said:</span> {transcript}
+                </div>
+              )}
+              
               {vapiError && (
                 <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
                   ⚠️ {vapiError}
@@ -386,14 +470,12 @@ ${generatedQuestion.hints?.map((hint, i) => `${i + 1}. ${hint}`).join('\n') || '
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-gray-500 py-8">
-            <p className="mb-2">👋 Hi! I&apos;m your AI coding tutor.</p>
-            <p className="text-sm mb-4">I can help you with:</p>
-            <ul className="text-sm space-y-1 text-left max-w-xs mx-auto">
-              <li>• Generate coding problems by type</li>
-              <li>• Review and debug your code</li>
-              <li>• Provide hints and explanations</li>
-              <li>• Show complete solutions</li>
-            </ul>
+            <div className="text-4xl mb-4">🎯</div>
+            <p className="text-lg font-medium mb-2">Ready to level up your coding?</p>
+            <p className="text-sm mb-4">I&apos;ll help you practice with personalized problems and guidance</p>
+            <Button onClick={startProblemDiscovery} className="bg-blue-600 text-white">
+              Let&apos;s Get Started!
+            </Button>
           </div>
         )}
         

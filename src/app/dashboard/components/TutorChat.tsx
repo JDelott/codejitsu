@@ -28,9 +28,19 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
 }, ref) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isProcessingProblem, setIsProcessingProblem] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { startCall, endCall, injectContext, isCallActive, isLoading: isVapiLoading, error: vapiError, transcript } = useVapi();
+  const { 
+    startCall, 
+    endCall, 
+    injectContext, 
+    isCallActive, 
+    isLoading: isVapiLoading, 
+    error: vapiError, 
+    transcript,
+    fullConversation
+  } = useVapi();
 
   useImperativeHandle(ref, () => ({
     submitCode: (code: string) => {
@@ -101,6 +111,60 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
     }
   };
 
+  // Function to manually create problem from conversation
+  const createProblemFromConversation = async () => {
+    if (!fullConversation) {
+      addMessage('tutor', 'No conversation to process yet. Start talking about what problem you want to work on!');
+      return;
+    }
+
+    setIsProcessingProblem(true);
+    addMessage('user', 'Create a problem based on our conversation');
+
+    try {
+      const response = await fetch('/api/tutor', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: `Based on this voice conversation, create a structured coding problem:\n\n${fullConversation}\n\nGenerate a proper coding problem with examples, constraints, and starter code.`,
+          context: null,
+          mode: 'generate'
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && !data.isText) {
+        const generatedQuestion: Question = {
+          id: Date.now(),
+          ...data.data
+        };
+        
+        // Apply to editor
+        if (onQuestionGenerated) {
+          onQuestionGenerated(generatedQuestion);
+        }
+        
+        addMessage('tutor', `🎯 Perfect! I've created the "${generatedQuestion.title}" problem and set it up in your editor. You can start coding now!`, generatedQuestion);
+        
+        // Confirm with voice
+        if (isCallActive) {
+          injectContext(`Great! I've set up the "${generatedQuestion.title}" problem in the editor. You can start coding now!`);
+        }
+        
+      } else {
+        addMessage('tutor', 'I had trouble creating a structured problem from our conversation. Let\'s try describing the problem more clearly.');
+      }
+    } catch (error) {
+      console.error('Error creating problem:', error);
+      addMessage('tutor', 'Sorry, I encountered an error creating the problem. Please try again.');
+    } finally {
+      setIsProcessingProblem(false);
+    }
+  };
+
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case 'Easy': return 'bg-green-100 text-green-800';
@@ -110,7 +174,6 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
     }
   };
 
-  // Enhanced context injection functions
   const injectCodeContext = () => {
     if (userCode && isCallActive) {
       injectContext(`Here's my current code in the editor:\n\n\`\`\`python\n${userCode}\n\`\`\`\n\nWhat do you think? Any suggestions?`);
@@ -156,8 +219,9 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
               I&apos;ll help you find the perfect coding problem and guide you through solving it. 
               Just start a voice conversation and tell me what you want to practice!
             </p>
+            
             <Button 
-              onClick={() => startCall(question, userCode)}
+              onClick={() => startCall(question, userCode, messages)}
               disabled={isVapiLoading}
               className="bg-blue-600 text-white px-8 py-3 text-lg"
             >
@@ -195,6 +259,23 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
                   📋 Share Problem
                 </Button>
               </div>
+              
+              {/* Manual Problem Creation Button */}
+              <Button 
+                size="sm"
+                onClick={createProblemFromConversation}
+                disabled={isProcessingProblem || !fullConversation}
+                className="w-full bg-purple-600 text-white"
+              >
+                {isProcessingProblem ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                    Creating Problem...
+                  </div>
+                ) : (
+                  <>🎯 Create Problem from Our Chat</>
+                )}
+              </Button>
               
               <Button 
                 variant="outline" 

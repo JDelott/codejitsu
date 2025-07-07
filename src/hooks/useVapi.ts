@@ -10,23 +10,39 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+// Add proper interfaces for VAPI messages
+interface VapiMessage {
+  type: string;
+  transcript?: string;
+  conversation?: VapiConversationEntry[];
+}
+
+interface VapiConversationEntry {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+interface VapiError {
+  message?: string;
+}
+
 export const useVapi = () => {
   const [vapi, setVapi] = useState<Vapi | null>(null);
   const [isCallActive, setIsCallActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>('');
+  const [fullConversation, setFullConversation] = useState<string>('');
 
   useEffect(() => {
-    // Initialize Vapi with your public key
     const vapiInstance = new Vapi(process.env.NEXT_PUBLIC_VAPI_API_KEY || '');
     setVapi(vapiInstance);
 
-    // Set up event listeners
     vapiInstance.on('call-start', () => {
       console.log('Call started');
       setIsCallActive(true);
       setIsLoading(false);
+      setFullConversation(''); // Reset conversation
     });
 
     vapiInstance.on('call-end', () => {
@@ -43,14 +59,23 @@ export const useVapi = () => {
       console.log('User stopped speaking');
     });
 
-    vapiInstance.on('message', (message) => {
+    vapiInstance.on('message', (message: VapiMessage) => {
       console.log('Message received:', message);
+      
       if (message.type === 'transcript') {
-        setTranscript(message.transcript);
+        setTranscript(message.transcript || '');
+      }
+      
+      // Capture full conversation
+      if (message.type === 'conversation-update' && Array.isArray(message.conversation)) {
+        const conversationText = message.conversation
+          .map((msg: VapiConversationEntry) => `${msg.role}: ${msg.content}`)
+          .join('\n\n');
+        setFullConversation(conversationText);
       }
     });
 
-    vapiInstance.on('error', (error) => {
+    vapiInstance.on('error', (error: VapiError) => {
       console.error('Vapi error:', error);
       setError(error.message || 'An error occurred');
       setIsLoading(false);
@@ -69,6 +94,7 @@ export const useVapi = () => {
     chatHistory: ChatMessage[] = []
   ) => {
     if (!vapi) return;
+    
     setIsLoading(true);
     setError(null);
     
@@ -79,7 +105,6 @@ export const useVapi = () => {
         throw new Error('Assistant ID not found.');
       }
       
-      // Create comprehensive context for problem creation
       const editorContext = userCode ? 
         `Current code in editor:\n\`\`\`python\n${userCode}\n\`\`\`` : 
         'Editor is empty - ready to start fresh';
@@ -98,31 +123,6 @@ export const useVapi = () => {
       };
       
       await vapi.start(assistantId, assistantOverrides);
-      
-      // After call starts, give initial context
-      setTimeout(() => {
-        if (vapi && isCallActive) {
-          let initialContext = "I'm ready to help you code! ";
-          
-          if (question) {
-            initialContext += `I can see you're working on "${question.title}". `;
-          }
-          
-          if (userCode && userCode.trim()) {
-            initialContext += `I can see you have some code in the editor. `;
-          }
-          
-          initialContext += `What would you like to work on today?`;
-          
-          vapi.send({
-            type: "add-message" as const,
-            message: {
-              role: "assistant",
-              content: initialContext
-            }
-          });
-        }
-      }, 1000);
       
     } catch (err) {
       console.error('Failed to start call:', err);
@@ -156,5 +156,6 @@ export const useVapi = () => {
     isLoading,
     error,
     transcript,
+    fullConversation,
   };
 };

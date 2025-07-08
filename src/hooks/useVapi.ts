@@ -26,7 +26,18 @@ interface VapiError {
   message?: string;
 }
 
-export const useVapi = () => {
+interface UseVapiReturn {
+  startCall: (question?: Question | null, userCode?: string, chatHistory?: ChatMessage[]) => Promise<void>;
+  endCall: () => void;
+  injectContext: (contextMessage: string) => void;
+  isCallActive: boolean;
+  isLoading: boolean;
+  error: string | null;
+  transcript: string;
+  fullConversation: string;
+}
+
+export const useVapi = (): UseVapiReturn => {
   const [vapi, setVapi] = useState<Vapi | null>(null);
   const [isCallActive, setIsCallActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);

@@ -66,6 +66,19 @@ export async function POST(request: NextRequest) {
         }`;
         break;
         
+      case 'problem_discussion':
+        systemPrompt = `You are a concise coding tutor helping users quickly find coding problems to practice.
+
+        IMPORTANT RULES:
+        1. Be extremely concise - maximum 2-3 short sentences
+        2. Ask 1-2 specific questions to understand what they want to practice
+        3. After 1-2 exchanges, suggest a SPECIFIC problem with title, difficulty, and brief description
+        4. Always end your problem suggestion with: "Should I create this problem for you?"
+        5. NO long explanations - get to the point quickly
+        
+        Current problem context: ${context ? JSON.stringify(context) : 'No context provided'}`;
+        break;
+        
       case 'hint':
         systemPrompt = `You are a coding tutor. The user is working on a coding problem and needs guidance. 
         Provide helpful hints and ask guiding questions without giving away the complete solution. 

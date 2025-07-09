@@ -217,7 +217,8 @@ No pseudocode written yet.`;
           userCode: editorContext,
           problemTitle: question?.title || 'No current problem',
           problemDifficulty: question?.difficulty || 'To be determined',
-          chatHistory: chatHistorySummary
+          chatHistory: chatHistorySummary,
+          instructions: 'Be extremely concise and direct. Ask 1-2 questions max, then suggest a specific problem and ask "Should I create this problem for you?" Keep responses under 3 sentences.'
         }
       };
       
@@ -275,7 +276,8 @@ No pseudocode written yet.`;
             userCode: 'Resuming previous conversation',
             problemTitle: 'Continuing previous session',
             problemDifficulty: 'Resuming',
-            chatHistory: `Resuming paused conversation:\n\n${pausedConversationSummary}\n\nWe're continuing our conversation now.`
+            chatHistory: `Resuming paused conversation:\n\n${pausedConversationSummary}\n\nWe're continuing our conversation now.`,
+            instructions: 'Be extremely concise and direct. Continue from where we left off.'
           }
         };
         

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Question } from '@/types/question';
 import { useVapi } from '@/hooks/useVapi';
@@ -11,6 +11,7 @@ interface Message {
   content: string;
   timestamp: Date;
   question?: Question;
+  needsConfirmation?: boolean;
 }
 
 interface TutorChatProps {
@@ -23,31 +24,38 @@ interface TutorChatProps {
 
 // Interface for chat bubble messages
 interface ChatBubbleMessage {
+  id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp?: Date;
   isFromVoice?: boolean;
+  needsConfirmation?: boolean;
 }
 
-// Chat bubble component with progressive loading
+// Enhanced chat bubble component with confirmation buttons
 const ChatBubble = ({ 
   message, 
   isLoading = false, 
-  isTyping = false 
+  isTyping = false,
+  onConfirm,
+  onDeny,
+  showConfirmation = false
 }: { 
   message: ChatBubbleMessage; 
   isLoading?: boolean; 
-  isTyping?: boolean; 
+  isTyping?: boolean;
+  onConfirm?: () => void;
+  onDeny?: () => void;
+  showConfirmation?: boolean;
 }) => {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   
-  if (isSystem) return null; // Don't render system messages
+  if (isSystem) return null;
   
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4 animate-slideInUp`}>
       <div className={`max-w-[85%] ${isUser ? 'ml-12' : 'mr-12'}`}>
-        {/* Avatar */}
         <div className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
             isUser 
@@ -57,7 +65,6 @@ const ChatBubble = ({
             {isUser ? (message.isFromVoice ? 'V' : 'U') : 'AI'}
           </div>
           
-          {/* Message content */}
           <div className={`relative max-w-full ${isUser ? 'text-right' : 'text-left'}`}>
             <div className={`inline-block px-4 py-3 rounded-2xl ${
               isUser 
@@ -82,7 +89,26 @@ const ChatBubble = ({
               </div>
             </div>
             
-            {/* Timestamp */}
+            {showConfirmation && !isUser && !isLoading && !isTyping && (
+              <div className="mt-3 flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={onConfirm}
+                  className="bg-green-600 text-white hover:bg-green-700 px-4 py-2 text-sm"
+                >
+                  ✓ Yes, let&apos;s do it!
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onDeny}
+                  className="border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 text-sm"
+                >
+                  ✗ No, let&apos;s adjust
+                </Button>
+              </div>
+            )}
+            
             <div className={`text-xs text-gray-500 mt-1 ${isUser ? 'text-right' : 'text-left'}`}>
               {message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
             </div>
@@ -93,7 +119,7 @@ const ChatBubble = ({
   );
 };
 
-// Clean message input component with microphone and pause
+// MessageInput component (keeping the same)
 const MessageInput = ({ 
   onSendMessage, 
   disabled, 
@@ -169,7 +195,6 @@ const MessageInput = ({
           className="w-full px-4 py-3 pr-28 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50 disabled:cursor-not-allowed"
         />
         
-        {/* Pause Button - only show when voice is active */}
         {(isVoiceActive || isPaused) && (
           <button
             type="button"
@@ -194,7 +219,6 @@ const MessageInput = ({
           </button>
         )}
         
-        {/* Microphone Button */}
         <button
           type="button"
           onClick={handleVoiceToggle}
@@ -222,7 +246,6 @@ const MessageInput = ({
           )}
         </button>
         
-        {/* Send Button */}
         <button
           type="submit"
           disabled={!message.trim() || disabled}
@@ -249,6 +272,8 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
   const [isProcessingProblem, setIsProcessingProblem] = useState(false);
   const [allMessages, setAllMessages] = useState<ChatBubbleMessage[]>([]);
   const [showActions, setShowActions] = useState(false);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [confirmationMessageId, setConfirmationMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { 
@@ -279,11 +304,57 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Merge voice and text messages
+  // More specific confirmation detection
+  const checkIfNeedsConfirmation = useCallback((content: string): boolean => {
+    const confirmationPatterns = [
+      /does this sound good/i,
+      /should I create this problem for you/i,
+      /would you like me to create this problem/i,
+      /shall I set up this problem/i,
+      /want me to generate this problem/i,
+      /ready to work on this problem/i,
+      /should I make this problem/i,
+      /would you like to try this problem/i,
+      /interested in this problem/i,
+      /want to tackle this problem/i,
+      /sound like a good problem/i,
+      /ready to start with/i,
+      /shall we work on/i,
+      /want to work on/i
+    ];
+    
+    return confirmationPatterns.some(pattern => pattern.test(content));
+  }, []);
+
+  // Handle auto-pause when confirmation is detected - separate from message processing
+  const handleConfirmationDetected = useCallback((messageId: string) => {
+    if (!awaitingConfirmation) {
+      console.log('Confirmation detected, setting up UI');
+      setAwaitingConfirmation(true);
+      setConfirmationMessageId(messageId);
+      
+      // Auto-pause after a delay to avoid infinite loop
+      if (isCallActive && !isPaused) {
+        setTimeout(() => {
+          console.log('Auto-pausing for confirmation');
+          pauseCall();
+        }, 1000);
+      }
+    }
+  }, [awaitingConfirmation, isCallActive, isPaused, pauseCall]);
+
+  // Process messages - FIXED dependency array
   useEffect(() => {
-    const voiceMessages = conversationMessages.map(msg => ({
+    console.log('Processing messages:', { 
+      voiceMessages: conversationMessages.length, 
+      textMessages: messages.length 
+    });
+
+    const voiceMessages = conversationMessages.map((msg, index) => ({
       ...msg,
-      isFromVoice: true
+      id: `voice-${index}-${msg.role}-${msg.content.substring(0, 10)}`,
+      isFromVoice: true,
+      needsConfirmation: msg.role === 'assistant' ? checkIfNeedsConfirmation(msg.content) : false
     }));
     
     const textMessages = messages.map(msg => ({
@@ -291,7 +362,8 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
       role: msg.type === 'user' ? 'user' as const : 'assistant' as const,
       content: msg.content,
       timestamp: msg.timestamp,
-      isFromVoice: false
+      isFromVoice: false,
+      needsConfirmation: msg.needsConfirmation || false
     }));
 
     // Combine and sort by timestamp
@@ -299,9 +371,17 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
       new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
     );
 
+    console.log('Combined messages:', combined.length);
     setAllMessages(combined);
-  }, [conversationMessages, messages]);
+    
+    // Check for confirmation needs - but don't trigger pause here
+    const lastAssistantMessage = combined.filter(msg => msg.role === 'assistant').pop();
+    if (lastAssistantMessage && lastAssistantMessage.needsConfirmation) {
+      handleConfirmationDetected(lastAssistantMessage.id);
+    }
+  }, [conversationMessages, messages, checkIfNeedsConfirmation, handleConfirmationDetected]);
 
+  // Separate useEffect for scrolling
   useEffect(() => {
     scrollToBottom();
   }, [allMessages, transcript]);
@@ -310,14 +390,16 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
     onSubmissionStateChange?.(isLoading);
   }, [isLoading, onSubmissionStateChange]);
 
-  const addMessage = (type: 'user' | 'tutor', content: string, questionData?: Question) => {
+  const addMessage = (type: 'user' | 'tutor', content: string, questionData?: Question, needsConfirmation = false) => {
     const newMessage: Message = {
-      id: Date.now().toString(),
+      id: `text-${Date.now()}-${Math.random()}`,
       type,
       content,
       timestamp: new Date(),
-      question: questionData
+      question: questionData,
+      needsConfirmation
     };
+    console.log('Adding message:', newMessage);
     setMessages(prev => [...prev, newMessage]);
   };
 
@@ -345,14 +427,15 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
         body: JSON.stringify({
           message: messageContent,
           context,
-          mode: 'hint'
+          mode: 'problem_discussion'
         }),
       });
 
       const data = await response.json();
 
       if (data.success) {
-        addMessage('tutor', data.data);
+        const needsConfirmation = checkIfNeedsConfirmation(data.data);
+        addMessage('tutor', data.data, undefined, needsConfirmation);
       } else {
         addMessage('tutor', 'Sorry, I encountered an error. Please try again.');
       }
@@ -406,7 +489,17 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
   };
 
   const handleStartVoice = () => {
+    console.log('Starting voice chat');
+    setAwaitingConfirmation(false);
+    setConfirmationMessageId(null);
+    
     startCall(question, userCode, userPseudoCode, messages);
+    
+    setTimeout(() => {
+      if (isCallActive) {
+        injectContext("Hi! I need a Python coding problem to practice. What do you suggest? Be concise and suggest something specific.");
+      }
+    }, 2000);
   };
 
   const handleEndVoice = () => {
@@ -421,10 +514,31 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
     resumeCall();
   };
 
+  const handleConfirmProblem = async () => {
+    setAwaitingConfirmation(false);
+    setConfirmationMessageId(null);
+    
+    await createProblemFromConversation();
+    
+    if (isPaused) {
+      setTimeout(() => resumeCall(), 500);
+    }
+  };
+
+  const handleDenyProblem = () => {
+    setAwaitingConfirmation(false);
+    setConfirmationMessageId(null);
+    
+    addMessage('user', 'Let\'s try a different problem. What else do you suggest?');
+    
+    if (isPaused) {
+      setTimeout(() => resumeCall(), 500);
+    }
+  };
+
   const createProblemFromConversation = async (usePausedHistory = false) => {
     let conversationText = '';
     
-    // Determine which conversation to use
     if (usePausedHistory && pausedHistory.length > 0) {
       conversationText = pausedHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n\n');
     } else if (fullConversation) {
@@ -439,7 +553,7 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
     }
 
     setIsProcessingProblem(true);
-    addMessage('user', usePausedHistory ? 'Create a problem based on our paused conversation' : 'Create a problem based on our conversation');
+    addMessage('user', 'Perfect! Create the problem for me.');
 
     try {
       const response = await fetch('/api/tutor', {
@@ -448,7 +562,7 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: `Based on this voice conversation, create a structured coding problem:\n\n${conversationText}\n\nGenerate a proper coding problem with examples, constraints, and starter code. Make sure the problem is well-structured and complete.`,
+          message: `Based on this conversation about creating a Python problem, generate a structured coding problem:\n\n${conversationText}\n\nCreate a complete, well-structured coding problem with examples, constraints, and starter code. The user has confirmed they want to work on this problem.`,
           context: null,
           mode: 'generate'
         }),
@@ -462,16 +576,16 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
           ...data.data
         };
         
-        // Apply to editor
         if (onQuestionGenerated) {
           onQuestionGenerated(generatedQuestion);
         }
         
-        addMessage('tutor', `Perfect! I've created the "${generatedQuestion.title}" problem and set it up in your editor. You can start coding now!`, generatedQuestion);
+        addMessage('tutor', `Excellent! I've created the "${generatedQuestion.title}" problem and set it up in your editor. You can now start working on your pseudocode and implementation!`, generatedQuestion);
         
-        // If voice is active, inject context
         if (isCallActive && !isPaused) {
-          injectContext(`Great! I've set up the "${generatedQuestion.title}" problem in the editor. You can start coding now!`);
+          setTimeout(() => {
+            injectContext(`Great! I've set up the "${generatedQuestion.title}" problem in the editor. You can start working on it now!`);
+          }, 1000);
         }
         
       } else {
@@ -494,79 +608,28 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
     }
   };
 
-  const injectCodeContext = () => {
-    if (userCode && userPseudoCode && isCallActive) {
-      injectContext(`Here's my current work in the editor:
-
-**Pseudocode/Planning:**
-${userPseudoCode}
-
-**Python Implementation:**
-\`\`\`python
-${userCode}
-\`\`\`
-
-What do you think? Any suggestions based on my approach?`);
-    } else if (userCode && isCallActive) {
-      injectContext(`Here's my current code in the editor:\n\n\`\`\`python\n${userCode}\n\`\`\`\n\nWhat do you think? Any suggestions?`);
-    } else if (userPseudoCode && isCallActive) {
-      injectContext(`Here's my current plan for the problem:
-
-**Pseudocode/Planning:**
-${userPseudoCode}
-
-I haven't started coding yet. What do you think of my approach?`);
-    } else if (isCallActive) {
-      injectContext("My editor is currently empty. I'm ready to start coding!");
-    }
-  };
-
-  const injectPseudoCodeContext = () => {
-    if (userPseudoCode && isCallActive) {
-      injectContext(`Here's my current pseudocode and planning:
-
-${userPseudoCode}
-
-Can you help me review this approach before I start coding?`);
-    } else if (isCallActive) {
-      injectContext("I haven't written any pseudocode yet. Can you help me think through the problem step by step?");
-    }
-  };
-
-  const injectProblemContext = () => {
-    if (question && isCallActive) {
-      injectContext(`Just to remind you, I'm working on: "${question.title}"\n\nDescription: ${question.description}\n\nDifficulty: ${question.difficulty}\n\nAny specific guidance for this problem?`);
-    } else if (isCallActive) {
-      injectContext("I don't have a specific problem yet. Can you help me find one that matches what I want to practice?");
-    }
-  };
-
   const getVoiceStatus = () => {
+    if (awaitingConfirmation) return 'Awaiting your choice';
     if (isPaused) return 'Voice paused';
     if (isCallActive) return 'Voice active';
     return 'Voice ready';
   };
 
-  const hasConversationForProblem = () => {
-    return (pausedHistory.length > 0) || (allMessages.length > 0) || fullConversation;
-  };
-
   return (
     <div className="flex flex-col h-full bg-white">
-      {/* Enhanced Header */}
+      {/* Header */}
       <div className="bg-white border-b border-gray-200 p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={`w-3 h-3 rounded-full ${
+              awaitingConfirmation ? 'bg-yellow-500 animate-pulse' :
               isPaused ? 'bg-orange-500' : 
               isCallActive ? 'bg-green-500 animate-pulse' : 
               'bg-gray-300'
             }`}></div>
             <div>
               <h2 className="font-medium text-gray-900">AI Coding Tutor</h2>
-              <p className="text-sm text-gray-500">
-                {getVoiceStatus()}
-              </p>
+              <p className="text-sm text-gray-500">{getVoiceStatus()}</p>
             </div>
           </div>
           
@@ -582,7 +645,6 @@ Can you help me review this approach before I start coding?`);
               </>
             )}
             
-            {/* Actions Toggle */}
             <Button
               size="sm"
               variant="outline"
@@ -595,100 +657,55 @@ Can you help me review this approach before I start coding?`);
         </div>
       </div>
 
-      {/* Collapsible Actions */}
-      {showActions && (
-        <div className="bg-gray-50 border-b border-gray-200 p-4">
-          <div className="flex gap-2 mb-3">
-            {(isCallActive || isPaused) && (
-              <>
-                <Button 
-                  size="sm" 
-                  onClick={injectCodeContext}
-                  disabled={isPaused}
-                  className="flex-1 bg-purple-600 text-white hover:bg-purple-700 disabled:bg-gray-400"
-                >
-                  Share Code & Plan
-                </Button>
-                <Button 
-                  size="sm" 
-                  onClick={injectPseudoCodeContext}
-                  disabled={isPaused}
-                  className="flex-1 bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
-                >
-                  Share Pseudocode
-                </Button>
-                <Button 
-                  size="sm" 
-                  onClick={injectProblemContext}
-                  disabled={isPaused}
-                  className="flex-1 bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-gray-400"
-                >
-                  Share Problem
-                </Button>
-              </>
-            )}
-          </div>
-          
-          <div className="flex flex-col gap-2">
-            {/* Regular problem creation */}
-            <Button 
-              size="sm"
-              onClick={() => createProblemFromConversation(false)}
-              disabled={isProcessingProblem || !hasConversationForProblem()}
-              className="w-full bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-400"
-            >
-              {isProcessingProblem ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Creating Problem...
-                </div>
-              ) : (
-                'Create Problem from Current Chat'
-              )}
-            </Button>
-
-            {/* Paused transcript problem creation */}
-            {isPaused && pausedHistory.length > 0 && (
-              <Button 
-                size="sm"
-                onClick={() => createProblemFromConversation(true)}
-                disabled={isProcessingProblem}
-                className="w-full bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
-              >
-                {isProcessingProblem ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Creating Problem...
-                  </div>
-                ) : (
-                  'Create Problem from Paused Transcript'
-                )}
-              </Button>
-            )}
+      {/* Confirmation Alert */}
+      {awaitingConfirmation && (
+        <div className="bg-yellow-50 border-b border-yellow-200 p-3">
+          <div className="flex items-center gap-2 text-yellow-800">
+            <span className="font-medium">⚡ Quick Decision:</span>
+            <span className="text-sm">Voice chat paused. Choose Yes or No below to continue.</span>
           </div>
         </div>
       )}
 
-      {/* Clean Chat Container */}
+      {/* Debug info */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-gray-50 border-b border-gray-200 p-2 text-xs">
+          <div>Messages: {allMessages.length} | Voice: {conversationMessages.length} | Text: {messages.length}</div>
+          <div>Awaiting: {awaitingConfirmation.toString()} | Confirmation ID: {confirmationMessageId}</div>
+          <div>Voice Active: {isCallActive.toString()} | Paused: {isPaused.toString()}</div>
+        </div>
+      )}
+
+      {/* Chat Container */}
       <div className="flex-1 overflow-y-auto p-4 space-y-1">
         {allMessages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500">
             <div className="text-center">
-              <div className="text-4xl mb-4">Chat</div>
-              <p className="text-lg">Start a conversation to get help with coding!</p>
-              <p className="text-sm mt-2">You can type below or click the microphone to start voice chat</p>
+              <div className="text-4xl mb-4">🚀</div>
+              <p className="text-lg">Quick Python Problem Generator</p>
+              <p className="text-sm mt-2">Click the microphone for a brief, focused chat!</p>
+              <p className="text-xs mt-1 text-gray-400">I&apos;ll suggest a problem quickly and pause for your confirmation</p>
             </div>
           </div>
         ) : (
-          allMessages.map((message, index) => (
-            <ChatBubble key={index} message={message} />
-          ))
+          <>
+            {allMessages.map((message) => (
+              <ChatBubble 
+                key={message.id} 
+                message={message} 
+                showConfirmation={awaitingConfirmation && confirmationMessageId === message.id}
+                onConfirm={handleConfirmProblem}
+                onDeny={handleDenyProblem}
+              />
+            ))}
+          </>
         )}
         
-        {/* Show typing indicator when assistant is speaking or loading */}
-        {(isSpeaking || isLoading) && !isPaused && (
+        {/* Typing indicator */}
+        {(isSpeaking || isLoading) && !isPaused && !awaitingConfirmation && (
           <ChatBubble 
             message={{
+              id: 'typing-indicator',
               role: 'assistant',
               content: '',
               timestamp: new Date()
@@ -700,8 +717,8 @@ Can you help me review this approach before I start coding?`);
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Voice Status Display */}
-      {(isCallActive || isPaused) && (transcript || isUserSpeaking) && (
+      {/* Voice Status */}
+      {(isCallActive || isPaused) && (transcript || isUserSpeaking) && !awaitingConfirmation && (
         <div className={`border-t p-3 ${
           isPaused ? 'bg-orange-50 border-orange-200' : 'bg-blue-50 border-blue-200'
         }`}>
@@ -720,21 +737,11 @@ Can you help me review this approach before I start coding?`);
               <div className={`text-sm ${
                 isPaused ? 'text-orange-800' : 'text-blue-800'
               }`}>
-                {isPaused ? 'Click resume to continue' : 
+                {isPaused ? 'Waiting for your choice' : 
                  transcript || 'Listening...'}
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Paused History Info */}
-      {isPaused && pausedHistory.length > 0 && (
-        <div className="bg-yellow-50 border-t border-yellow-200 p-3">
-          <div className="flex items-center gap-2 text-yellow-800">
-            <span className="font-medium">Paused Session:</span>
-            <span className="text-sm">{pausedHistory.length} messages saved. Use &quot;Create Problem from Paused Transcript&quot; to generate a coding problem.</span>
-          </div>  
         </div>
       )}
 
@@ -748,11 +755,11 @@ Can you help me review this approach before I start coding?`);
         </div>
       )}
 
-      {/* Message Input with Microphone and Pause */}
+      {/* Message Input */}
       <MessageInput
         onSendMessage={handleTextMessage}
         disabled={isLoading}
-        placeholder="Type your message or click the microphone to start voice chat..."
+        placeholder="Type your message or click the microphone to discuss what Python problem you'd like to work on..."
         onStartVoice={handleStartVoice}
         onEndVoice={handleEndVoice}
         onPauseVoice={handlePauseVoice}
@@ -766,4 +773,4 @@ Can you help me review this approach before I start coding?`);
   );
 });
 
-TutorChat.displayName = 'TutorChat'; 
+TutorChat.displayName = 'TutorChat';

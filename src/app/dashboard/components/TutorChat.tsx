@@ -16,6 +16,7 @@ interface Message {
 interface TutorChatProps {
   question?: Question | null;
   userCode?: string;
+  userPseudoCode?: string;
   onQuestionGenerated?: (question: Question) => void;
   onSubmissionStateChange?: (isSubmitting: boolean) => void;
 }
@@ -239,6 +240,7 @@ const MessageInput = ({
 export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, TutorChatProps>(({ 
   question, 
   userCode, 
+  userPseudoCode,
   onQuestionGenerated,
   onSubmissionStateChange
 }, ref) => {
@@ -330,6 +332,7 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
         title: question.title,
         description: question.description,
         userCode: userCode || '',
+        userPseudoCode: userPseudoCode || '',
         difficulty: question.difficulty,
         category: question.category
       } : null;
@@ -370,6 +373,7 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
         title: question.title,
         description: question.description,
         userCode: code,
+        userPseudoCode: userPseudoCode || '',
         difficulty: question.difficulty,
         category: question.category
       } : null;
@@ -402,7 +406,7 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
   };
 
   const handleStartVoice = () => {
-    startCall(question, userCode, messages);
+    startCall(question, userCode, userPseudoCode, messages);
   };
 
   const handleEndVoice = () => {
@@ -491,10 +495,41 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
   };
 
   const injectCodeContext = () => {
-    if (userCode && isCallActive) {
+    if (userCode && userPseudoCode && isCallActive) {
+      injectContext(`Here's my current work in the editor:
+
+**Pseudocode/Planning:**
+${userPseudoCode}
+
+**Python Implementation:**
+\`\`\`python
+${userCode}
+\`\`\`
+
+What do you think? Any suggestions based on my approach?`);
+    } else if (userCode && isCallActive) {
       injectContext(`Here's my current code in the editor:\n\n\`\`\`python\n${userCode}\n\`\`\`\n\nWhat do you think? Any suggestions?`);
+    } else if (userPseudoCode && isCallActive) {
+      injectContext(`Here's my current plan for the problem:
+
+**Pseudocode/Planning:**
+${userPseudoCode}
+
+I haven't started coding yet. What do you think of my approach?`);
     } else if (isCallActive) {
       injectContext("My editor is currently empty. I'm ready to start coding!");
+    }
+  };
+
+  const injectPseudoCodeContext = () => {
+    if (userPseudoCode && isCallActive) {
+      injectContext(`Here's my current pseudocode and planning:
+
+${userPseudoCode}
+
+Can you help me review this approach before I start coding?`);
+    } else if (isCallActive) {
+      injectContext("I haven't written any pseudocode yet. Can you help me think through the problem step by step?");
     }
   };
 
@@ -572,7 +607,15 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
                   disabled={isPaused}
                   className="flex-1 bg-purple-600 text-white hover:bg-purple-700 disabled:bg-gray-400"
                 >
-                  Share Code
+                  Share Code & Plan
+                </Button>
+                <Button 
+                  size="sm" 
+                  onClick={injectPseudoCodeContext}
+                  disabled={isPaused}
+                  className="flex-1 bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
+                >
+                  Share Pseudocode
                 </Button>
                 <Button 
                   size="sm" 

@@ -36,7 +36,7 @@ interface ConversationMessage {
 }
 
 interface UseVapiReturn {
-  startCall: (question?: Question | null, userCode?: string, chatHistory?: ChatMessage[]) => Promise<void>;
+  startCall: (question?: Question | null, userCode?: string, userPseudoCode?: string, chatHistory?: ChatMessage[]) => Promise<void>;
   endCall: () => void;
   pauseCall: () => void;
   resumeCall: () => void;
@@ -151,6 +151,7 @@ export const useVapi = (): UseVapiReturn => {
   const startCall = async (
     question?: Question | null, 
     userCode?: string, 
+    userPseudoCode?: string,
     chatHistory: ChatMessage[] = []
   ) => {
     if (!vapi) return;
@@ -165,9 +166,35 @@ export const useVapi = (): UseVapiReturn => {
         throw new Error('Assistant ID not found.');
       }
       
-      const editorContext = userCode ? 
-        `Current code in editor:\n\`\`\`python\n${userCode}\n\`\`\`` : 
-        'Editor is empty - ready to start fresh';
+      // Build comprehensive editor context
+      let editorContext = '';
+      
+      if (userPseudoCode && userCode) {
+        editorContext = `Current work in editor:
+
+**Pseudocode/Planning:**
+${userPseudoCode}
+
+**Python Implementation:**
+\`\`\`python
+${userCode}
+\`\`\``;
+      } else if (userPseudoCode) {
+        editorContext = `Current pseudocode in editor:
+
+${userPseudoCode}
+
+Python code section is still empty - ready to implement.`;
+      } else if (userCode) {
+        editorContext = `Current code in editor:
+\`\`\`python
+${userCode}
+\`\`\`
+
+No pseudocode written yet.`;
+      } else {
+        editorContext = 'Editor is empty - ready to start fresh';
+      }
       
       // Include both regular chat history and paused history
       const allHistory = [...chatHistory];

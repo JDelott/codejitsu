@@ -11,6 +11,7 @@ export default function Dashboard() {
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [userCode, setUserCode] = useState('');
+  const [userPseudoCode, setUserPseudoCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resetTrigger, setResetTrigger] = useState(0);
   const chatRef = useRef<{ submitCode: (code: string) => void }>(null);
@@ -21,6 +22,10 @@ export default function Dashboard() {
 
   const handleCodeChange = (code: string) => {
     setUserCode(code);
+  };
+
+  const handlePseudoCodeChange = (pseudoCode: string) => {
+    setUserPseudoCode(pseudoCode);
   };
 
   const handleCodeSubmit = async (code: string) => {
@@ -115,6 +120,7 @@ export default function Dashboard() {
               <CodeEditor 
                 question={selectedQuestion} 
                 onCodeChange={handleCodeChange}
+                onPseudoCodeChange={handlePseudoCodeChange}
                 isSubmitting={isSubmitting}
                 resetTrigger={resetTrigger}
               />
@@ -132,6 +138,7 @@ export default function Dashboard() {
                 ref={chatRef}
                 question={selectedQuestion}
                 userCode={userCode}
+                userPseudoCode={userPseudoCode}
                 onQuestionGenerated={handleQuestionGenerated}
                 onSubmissionStateChange={setIsSubmitting}
               />

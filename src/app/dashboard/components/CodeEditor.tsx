@@ -8,7 +8,6 @@ interface CodeEditorProps {
   onCodeChange?: (code: string) => void;
   onPseudoCodeChange?: (pseudoCode: string) => void;
   onCodeSubmit?: (code: string) => void;
-  isSubmitting?: boolean;
   resetTrigger?: number;
 }
 
@@ -19,28 +18,31 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   resetTrigger
 }) => {
   const [pseudoCode, setPseudoCode] = useState('');
-  const [pythonCode, setPythonCode] = useState(
-    question?.starter || '# Write your Python code here\n\n'
-  );
+  const [pythonCode, setPythonCode] = useState('# Write your Python code here\n\n');
   const [isProblemCollapsed, setIsProblemCollapsed] = useState(false);
 
   // Update code when question changes
   useEffect(() => {
     if (question?.starter) {
       setPythonCode(question.starter);
-      setPseudoCode(''); // Clear pseudocode for new problem
+    } else {
+      setPythonCode('# Write your Python code here\n\n');
     }
+    setPseudoCode(''); // Always clear pseudocode when question changes
   }, [question?.id, question?.starter]);
 
-  // Handle reset trigger
+  // Handle reset trigger - fixed dependency array
   useEffect(() => {
-    if (resetTrigger) {
+    if (resetTrigger && resetTrigger > 0) {
+      console.log('Reset triggered:', resetTrigger);
+      // Always clear pseudocode
+      setPseudoCode('');
+      // Reset python code to starter or default
       if (question?.starter) {
         setPythonCode(question.starter);
       } else {
         setPythonCode('# Write your Python code here\n\n');
       }
-      setPseudoCode(''); // Clear pseudocode on reset
     }
   }, [resetTrigger, question?.starter]);
 
@@ -59,6 +61,14 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       case 'hard': return 'text-red-600 bg-red-50 border-red-200';
       default: return 'text-gray-600 bg-gray-50 border-gray-200';
     }
+  };
+
+  const handleClearPseudoCode = () => {
+    setPseudoCode('');
+  };
+
+  const handleResetPythonCode = () => {
+    setPythonCode(question?.starter || '# Write your Python code here\n\n');
   };
 
   return (
@@ -181,26 +191,25 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         )}
 
         {/* Code Editor Areas */}
-        {question && (
-          <div className="flex-1 flex flex-col p-6 bg-gray-50">
-            <div className="flex-1 flex gap-6 max-w-none">
-              
-              {/* Pseudocode Section - Left Half */}
-              <div className="flex-1 flex flex-col">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                    <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
-                    Pseudocode & Planning
-                  </h3>
-                  <div className="text-sm text-gray-500">
-                    Think through your approach
-                  </div>
+        <div className="flex-1 flex flex-col p-6 bg-gray-50">
+          <div className="flex-1 flex gap-6 max-w-none">
+            
+            {/* Pseudocode Section - Left Half */}
+            <div className="flex-1 flex flex-col">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                  <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
+                  Pseudocode & Planning
+                </h3>
+                <div className="text-sm text-gray-500">
+                  Think through your approach
                 </div>
-                <textarea
-                  value={pseudoCode}
-                  onChange={(e) => setPseudoCode(e.target.value)}
-                  className="flex-1 p-4 border border-gray-300 rounded-lg font-[family-name:var(--font-geist-mono)] text-sm resize-none focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 shadow-sm bg-blue-50/50 min-h-0"
-                  placeholder="Plan your solution here...
+              </div>
+              <textarea
+                value={pseudoCode}
+                onChange={(e) => setPseudoCode(e.target.value)}
+                className="flex-1 p-4 border border-gray-300 rounded-lg font-[family-name:var(--font-geist-mono)] text-sm resize-none focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 shadow-sm bg-blue-50/50 min-h-0"
+                placeholder="Plan your solution here...
 
 Example:
 1. Parse the input and understand the problem
@@ -214,60 +223,59 @@ Tips:
 - Break down complex problems into smaller parts
 - Think about time and space complexity
 - Consider different approaches (brute force vs optimized)"
-                  spellCheck={false}
-                  style={{ fontSize: '14px', lineHeight: '1.6' }}
-                />
-                <div className="flex items-center justify-between mt-2">
-                  <button
-                    onClick={() => setPseudoCode('')}
-                    className="text-sm text-gray-500 hover:text-gray-700"
-                  >
-                    Clear
-                  </button>
-                  <div className="text-xs text-gray-400">
-                    {pseudoCode.split('\n').length} lines
-                  </div>
+                spellCheck={false}
+                style={{ fontSize: '14px', lineHeight: '1.6' }}
+              />
+              <div className="flex items-center justify-between mt-2">
+                <button
+                  onClick={handleClearPseudoCode}
+                  className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Clear
+                </button>
+                <div className="text-xs text-gray-400">
+                  {pseudoCode.split('\n').length} lines
                 </div>
               </div>
-
-              {/* Vertical Divider */}
-              <div className="w-px bg-gray-300"></div>
-
-              {/* Python Code Section - Right Half */}
-              <div className="flex-1 flex flex-col">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                    <span className="w-3 h-3 bg-green-500 rounded-full"></span>
-                    Python Implementation
-                  </h3>
-                  <div className="text-sm text-gray-500">
-                    Translate your plan into code
-                  </div>
-                </div>
-                <textarea
-                  value={pythonCode}
-                  onChange={(e) => setPythonCode(e.target.value)}
-                  className="flex-1 p-4 border border-gray-300 rounded-lg font-[family-name:var(--font-geist-mono)] text-sm resize-none focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 shadow-sm bg-green-50/50 min-h-0"
-                  placeholder="Implement your solution here..."
-                  spellCheck={false}
-                  style={{ fontSize: '14px', lineHeight: '1.6' }}
-                />
-                <div className="flex items-center justify-between mt-2">
-                  <button
-                    onClick={() => setPythonCode(question?.starter || '# Write your Python code here\n\n')}
-                    className="text-sm text-gray-500 hover:text-gray-700"
-                  >
-                    Reset
-                  </button>
-                  <div className="text-xs text-gray-400">
-                    {pythonCode.split('\n').length} lines • {pythonCode.length} chars
-                  </div>
-                </div>
-              </div>
-
             </div>
+
+            {/* Vertical Divider */}
+            <div className="w-px bg-gray-300"></div>
+
+            {/* Python Code Section - Right Half */}
+            <div className="flex-1 flex flex-col">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                  <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+                  Python Implementation
+                </h3>
+                <div className="text-sm text-gray-500">
+                  Translate your plan into code
+                </div>
+              </div>
+              <textarea
+                value={pythonCode}
+                onChange={(e) => setPythonCode(e.target.value)}
+                className="flex-1 p-4 border border-gray-300 rounded-lg font-[family-name:var(--font-geist-mono)] text-sm resize-none focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 shadow-sm bg-green-50/50 min-h-0"
+                placeholder="Implement your solution here..."
+                spellCheck={false}
+                style={{ fontSize: '14px', lineHeight: '1.6' }}
+              />
+              <div className="flex items-center justify-between mt-2">
+                <button
+                  onClick={handleResetPythonCode}
+                  className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Reset
+                </button>
+                <div className="text-xs text-gray-400">
+                  {pythonCode.split('\n').length} lines • {pythonCode.length} chars
+                </div>
+              </div>
+            </div>
+
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

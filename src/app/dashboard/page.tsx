@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { Question } from '@/types/question';
 import { CodeEditor } from './components/CodeEditor';
@@ -12,9 +12,7 @@ export default function Dashboard() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [userCode, setUserCode] = useState('');
   const [userPseudoCode, setUserPseudoCode] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [resetTrigger, setResetTrigger] = useState(0);
-  const chatRef = useRef<{ submitCode: (code: string) => void }>(null);
 
   const handleQuestionGenerated = (question: Question) => {
     setSelectedQuestion(question);
@@ -26,24 +24,6 @@ export default function Dashboard() {
 
   const handlePseudoCodeChange = (pseudoCode: string) => {
     setUserPseudoCode(pseudoCode);
-  };
-
-  const handleCodeSubmit = async (code: string) => {
-    // Open chat if not already open
-    if (!isChatOpen) {
-      setIsChatOpen(true);
-      // Wait for chat to render before submitting
-      await new Promise(resolve => setTimeout(resolve, 300));
-    }
-    
-    // Submit code to chat
-    chatRef.current?.submitCode(code);
-  };
-
-  const handleGetFeedback = () => {
-    if (userCode.trim()) {
-      handleCodeSubmit(userCode);
-    }
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -95,13 +75,6 @@ export default function Dashboard() {
             {selectedQuestion ? 'Reset' : 'Clear'}
           </Button>
           <Button
-            onClick={handleGetFeedback}
-            disabled={isSubmitting || !userCode.trim()}
-            size="sm"
-          >
-            {isSubmitting ? 'Submitting...' : 'Get Feedback'}
-          </Button>
-          <Button
             size="sm"
             variant={isChatOpen ? "primary" : "outline"}
             onClick={() => setIsChatOpen(!isChatOpen)}
@@ -121,7 +94,6 @@ export default function Dashboard() {
                 question={selectedQuestion} 
                 onCodeChange={handleCodeChange}
                 onPseudoCodeChange={handlePseudoCodeChange}
-                isSubmitting={isSubmitting}
                 resetTrigger={resetTrigger}
               />
             </div>
@@ -135,12 +107,10 @@ export default function Dashboard() {
           {isChatOpen && (
             <div className="w-96 h-full">
               <TutorChat
-                ref={chatRef}
                 question={selectedQuestion}
                 userCode={userCode}
                 userPseudoCode={userPseudoCode}
                 onQuestionGenerated={handleQuestionGenerated}
-                onSubmissionStateChange={setIsSubmitting}
               />
             </div>
           )}

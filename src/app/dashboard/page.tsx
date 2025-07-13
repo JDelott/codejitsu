@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [userCode, setUserCode] = useState('');
   const [userPseudoCode, setUserPseudoCode] = useState('');
+  const [userDiagram, setUserDiagram] = useState('');
   const [resetTrigger, setResetTrigger] = useState(0);
 
   const handleQuestionGenerated = (question: Question) => {
@@ -24,6 +25,10 @@ export default function Dashboard() {
 
   const handlePseudoCodeChange = (pseudoCode: string) => {
     setUserPseudoCode(pseudoCode);
+  };
+
+  const handleDiagramChange = (diagram: string) => {
+    setUserDiagram(diagram);
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -94,6 +99,7 @@ export default function Dashboard() {
                 question={selectedQuestion} 
                 onCodeChange={handleCodeChange}
                 onPseudoCodeChange={handlePseudoCodeChange}
+                onDiagramChange={handleDiagramChange}
                 resetTrigger={resetTrigger}
               />
             </div>
@@ -110,6 +116,7 @@ export default function Dashboard() {
                 question={selectedQuestion}
                 userCode={userCode}
                 userPseudoCode={userPseudoCode}
+                userDiagram={userDiagram}
                 onQuestionGenerated={handleQuestionGenerated}
               />
             </div>

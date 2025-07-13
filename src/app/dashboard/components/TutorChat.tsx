@@ -18,6 +18,7 @@ interface TutorChatProps {
   question?: Question | null;
   userCode?: string;
   userPseudoCode?: string;
+  userDiagram?: string;
   onQuestionGenerated?: (question: Question) => void;
 }
 
@@ -248,6 +249,7 @@ export const TutorChat = forwardRef<{ resetChat: () => void }, TutorChatProps>((
   question, 
   userCode, 
   userPseudoCode, 
+  userDiagram,
   onQuestionGenerated 
 }, ref) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -396,6 +398,7 @@ export const TutorChat = forwardRef<{ resetChat: () => void }, TutorChatProps>((
           question: question?.title,
           userCode,
           userPseudoCode,
+          userDiagram,
           chatHistory: messages.map(msg => ({
             role: msg.type === 'user' ? 'user' : 'assistant',
             content: msg.content
@@ -408,10 +411,14 @@ export const TutorChat = forwardRef<{ resetChat: () => void }, TutorChatProps>((
       const data = await response.json();
       
       if (data.question) {
-        addMessage('tutor', data.response, data.question);
+        // Check if the response needs confirmation
+        const needsConfirmation = checkIfNeedsConfirmation(data.response);
+        addMessage('tutor', data.response, data.question, needsConfirmation);
         onQuestionGenerated?.(data.question);
       } else {
-        addMessage('tutor', data.response);
+        // Check if the response needs confirmation
+        const needsConfirmation = checkIfNeedsConfirmation(data.response);
+        addMessage('tutor', data.response, undefined, needsConfirmation);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -429,7 +436,7 @@ export const TutorChat = forwardRef<{ resetChat: () => void }, TutorChatProps>((
       timestamp: msg.timestamp
     }));
     
-    startCall(question, userCode, userPseudoCode, chatHistory);
+    startCall(question, userCode, userPseudoCode, userDiagram, chatHistory);
   };
 
   const handleEndVoice = () => {
@@ -490,6 +497,7 @@ export const TutorChat = forwardRef<{ resetChat: () => void }, TutorChatProps>((
           question: question?.title,
           userCode,
           userPseudoCode,
+          userDiagram,
           chatHistory: messages.map(msg => ({
             role: msg.type === 'user' ? 'user' : 'assistant',
             content: msg.content

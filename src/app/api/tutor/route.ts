@@ -137,7 +137,7 @@ function generateFallbackProblem(conversationContext: string):unknown {
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, question, userCode, userPseudoCode, chatHistory, context, mode } = await request.json();
+    const { message, question, userCode, userPseudoCode, userDiagram, chatHistory, context, mode } = await request.json();
 
     // Determine the mode based on the message content if not explicitly provided
     let actualMode = mode;
@@ -156,8 +156,27 @@ export async function POST(request: NextRequest) {
       currentQuestion: question,
       userCode,
       userPseudoCode,
+      userDiagram,
       chatHistory: chatHistory || [],
       ...(context || {})
+    };
+
+    // Helper function to describe diagram for AI
+    const describeDiagramForAI = (diagramData: string) => {
+      if (!diagramData) return '';
+      
+      if (diagramData.startsWith('data:text/plain;base64,')) {
+        // Text diagram
+        const textContent = atob(diagramData.split(',')[1]);
+        return `User's Diagram (Text Format):
+${textContent}
+
+This diagram shows the user's visual approach to solving the problem.`;
+      } else if (diagramData.startsWith('data:image/png;base64,')) {
+        // Drawing diagram
+        return `User's Diagram: The user has created a visual diagram/drawing to help solve the problem. While I cannot see the specific details of the drawing, I should acknowledge that they have created a visual representation and ask them to describe it if needed for better assistance.`;
+      }
+      return '';
     };
 
     let systemPrompt = '';
@@ -186,7 +205,9 @@ export async function POST(request: NextRequest) {
           "hints": ["hint 1", "hint 2", "hint 3"]
         }
         
-        Context: ${JSON.stringify(contextData)}`;
+        Context: ${JSON.stringify(contextData)}
+        
+        ${userDiagram ? describeDiagramForAI(userDiagram) : ''}`;
         break;
         
       case 'problem_discussion':
@@ -198,14 +219,19 @@ export async function POST(request: NextRequest) {
         3. After 1-2 exchanges, suggest a SPECIFIC problem with title, difficulty, and brief description
         4. Always end your problem suggestion with: "Should I create this problem for you?"
         5. NO long explanations - get to the point quickly
+        6. If the user has created a diagram, acknowledge it and ask them to describe it if it helps understand their approach
         
-        Context: ${JSON.stringify(contextData)}`;
+        Context: ${JSON.stringify(contextData)}
+        
+        ${userDiagram ? describeDiagramForAI(userDiagram) : ''}`;
         break;
         
       default:
         systemPrompt = `You are a helpful coding tutor. Assist the user with their coding questions while being encouraging and educational.
         
-        Context: ${JSON.stringify(contextData)}`;
+        Context: ${JSON.stringify(contextData)}
+        
+        ${userDiagram ? describeDiagramForAI(userDiagram) : ''}`;
     }
 
     // Add retry logic with exponential backoff

@@ -36,7 +36,7 @@ interface ConversationMessage {
 }
 
 interface UseVapiReturn {
-  startCall: (question?: Question | null, userCode?: string, userPseudoCode?: string, chatHistory?: ChatMessage[]) => Promise<void>;
+  startCall: (question?: Question | null, userCode?: string, userPseudoCode?: string, userDiagram?: string, chatHistory?: ChatMessage[]) => Promise<void>;
   endCall: () => void;
   pauseCall: () => void;
   resumeCall: () => void;
@@ -152,6 +152,7 @@ export const useVapi = (): UseVapiReturn => {
     question?: Question | null, 
     userCode?: string, 
     userPseudoCode?: string,
+    userDiagram?: string,
     chatHistory: ChatMessage[] = []
   ) => {
     if (!vapi) return;
@@ -169,7 +170,35 @@ export const useVapi = (): UseVapiReturn => {
       // Build comprehensive editor context
       let editorContext = '';
       
-      if (userPseudoCode && userCode) {
+      // Helper function to describe diagram
+      const describeDiagram = (diagramData: string) => {
+        if (!diagramData) return '';
+        
+        if (diagramData.startsWith('data:text/plain;base64,')) {
+          // Text diagram
+          const textContent = atob(diagramData.split(',')[1]);
+          return `**Diagram (Text):**
+${textContent}`;
+        } else if (diagramData.startsWith('data:image/png;base64,')) {
+          // Drawing diagram
+          return `**Diagram (Drawing):** User has created a visual diagram to help solve the problem. The diagram is available as a drawing.`;
+        }
+        return '';
+      };
+
+      if (userPseudoCode && userCode && userDiagram) {
+        editorContext = `Current work in editor:
+
+**Pseudocode/Planning:**
+${userPseudoCode}
+
+**Python Implementation:**
+\`\`\`python
+${userCode}
+\`\`\`
+
+${describeDiagram(userDiagram)}`;
+      } else if (userPseudoCode && userCode) {
         editorContext = `Current work in editor:
 
 **Pseudocode/Planning:**
@@ -179,6 +208,23 @@ ${userPseudoCode}
 \`\`\`python
 ${userCode}
 \`\`\``;
+      } else if (userPseudoCode && userDiagram) {
+        editorContext = `Current pseudocode in editor:
+
+${userPseudoCode}
+
+${describeDiagram(userDiagram)}
+
+Python code section is still empty - ready to implement.`;
+      } else if (userCode && userDiagram) {
+        editorContext = `Current code in editor:
+\`\`\`python
+${userCode}
+\`\`\`
+
+${describeDiagram(userDiagram)}
+
+No pseudocode written yet.`;
       } else if (userPseudoCode) {
         editorContext = `Current pseudocode in editor:
 
@@ -192,6 +238,10 @@ ${userCode}
 \`\`\`
 
 No pseudocode written yet.`;
+      } else if (userDiagram) {
+        editorContext = `${describeDiagram(userDiagram)}
+
+Editor is otherwise empty - ready to start planning and coding.`;
       } else {
         editorContext = 'Editor is empty - ready to start fresh';
       }

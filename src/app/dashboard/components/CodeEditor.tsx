@@ -2,11 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { Question } from '@/types/question';
+import { DiagramEditor } from './DiagramEditor';
 
 interface CodeEditorProps {
   question: Question | null;
   onCodeChange?: (code: string) => void;
   onPseudoCodeChange?: (pseudoCode: string) => void;
+  onDiagramChange?: (diagram: string) => void;
   onCodeSubmit?: (code: string) => void;
   resetTrigger?: number;
 }
@@ -15,11 +17,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   question, 
   onCodeChange, 
   onPseudoCodeChange,
+  onDiagramChange,
   resetTrigger
 }) => {
   const [pseudoCode, setPseudoCode] = useState('');
   const [pythonCode, setPythonCode] = useState('# Write your Python code here\n\n');
   const [isProblemCollapsed, setIsProblemCollapsed] = useState(false);
+  const [diagram, setDiagram] = useState('');
 
   // Update code when question changes
   useEffect(() => {
@@ -29,6 +33,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       setPythonCode('# Write your Python code here\n\n');
     }
     setPseudoCode(''); // Always clear pseudocode when question changes
+    setDiagram(''); // Clear diagram when question changes
   }, [question?.id, question?.starter]);
 
   // Handle reset trigger - fixed dependency array
@@ -37,6 +42,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       console.log('Reset triggered:', resetTrigger);
       // Always clear pseudocode
       setPseudoCode('');
+      setDiagram('');
       // Reset python code to starter or default
       if (question?.starter) {
         setPythonCode(question.starter);
@@ -53,6 +59,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   useEffect(() => {
     onPseudoCodeChange?.(pseudoCode);
   }, [pseudoCode, onPseudoCodeChange]);
+
+  useEffect(() => {
+    onDiagramChange?.(diagram);
+  }, [diagram, onDiagramChange]);
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty?.toLowerCase()) {
@@ -71,13 +81,17 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     setPythonCode(question?.starter || '# Write your Python code here\n\n');
   };
 
+  const handleDiagramChange = (diagramData: string) => {
+    setDiagram(diagramData);
+  };
+
   return (
     <div className="flex-1 flex h-full">
       {/* Left Sidebar - Problem Description */}
       {question && (
         <div className={`${isProblemCollapsed ? 'w-12' : 'w-96'} border-r border-gray-200 bg-white flex flex-col transition-all duration-300`}>
           {/* Collapse/Expand Button */}
-          <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+          <div className="pl-2 pr-3 py-3 border-b border-gray-200 flex items-center justify-between">
             {!isProblemCollapsed && (
               <h2 className="text-lg font-semibold text-gray-800">Problem</h2>
             )}
@@ -100,7 +114,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
           {/* Problem Content */}
           {!isProblemCollapsed && (
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto pl-2 pr-4 py-4">
               {/* Problem Header */}
               <div className="mb-4">
                 <h1 className="text-xl font-bold text-gray-900 mb-2">{question.title}</h1>
@@ -168,6 +182,12 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   </div>
                 </details>
               )}
+
+              {/* Diagram Editor */}
+              <DiagramEditor
+                onDiagramChange={handleDiagramChange}
+                resetTrigger={resetTrigger}
+              />
             </div>
           )}
         </div>

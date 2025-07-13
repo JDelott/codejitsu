@@ -22,7 +22,6 @@ interface TutorChatProps {
   onSubmissionStateChange?: (isSubmitting: boolean) => void;
 }
 
-// Interface for chat bubble messages
 interface ChatBubbleMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -32,7 +31,6 @@ interface ChatBubbleMessage {
   needsConfirmation?: boolean;
 }
 
-// Enhanced chat bubble component with confirmation buttons
 const ChatBubble = ({ 
   message, 
   isLoading = false, 
@@ -49,77 +47,66 @@ const ChatBubble = ({
   showConfirmation?: boolean;
 }) => {
   const isUser = message.role === 'user';
-  const isSystem = message.role === 'system';
-  
-  if (isSystem) return null;
   
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4 animate-slideInUp`}>
-      <div className={`max-w-[85%] ${isUser ? 'ml-12' : 'mr-12'}`}>
-        <div className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-            isUser 
-              ? 'bg-blue-500 text-white' 
-              : 'bg-gradient-to-br from-purple-500 to-pink-500 text-white'
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+        isUser 
+          ? 'bg-blue-500 text-white' 
+          : 'bg-white text-gray-800 border border-gray-200'
+      }`}>
+        <div className="flex items-center space-x-2 mb-1">
+          {message.isFromVoice && (
+            <div className="w-2 h-2 bg-green-500 rounded-full" />
+          )}
+          <span className={`text-xs font-medium ${
+            isUser ? 'text-blue-100' : 'text-gray-500'
           }`}>
-            {isUser ? (message.isFromVoice ? 'V' : 'U') : 'AI'}
-          </div>
-          
-          <div className={`relative max-w-full ${isUser ? 'text-right' : 'text-left'}`}>
-            <div className={`inline-block px-4 py-3 rounded-2xl ${
-              isUser 
-                ? 'bg-blue-500 text-white rounded-br-sm' 
-                : 'bg-gray-100 text-gray-800 rounded-bl-sm border border-gray-200'
-            } ${isLoading ? 'opacity-70' : ''}`}>
-              <div className="text-sm leading-relaxed">
-                {isLoading || isTyping ? (
-                  <div className="flex items-center gap-1">
-                    <div className="flex gap-1">
-                      <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                      <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                    </div>
-                    <span className="text-xs ml-2">
-                      {isUser ? 'Speaking...' : 'Thinking...'}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="whitespace-pre-wrap">{message.content}</div>
-                )}
-              </div>
-            </div>
-            
-            {showConfirmation && !isUser && !isLoading && !isTyping && (
-              <div className="mt-3 flex gap-2">
-                <Button
-                  size="sm"
-                  onClick={onConfirm}
-                  className="bg-green-600 text-white hover:bg-green-700 px-4 py-2 text-sm"
-                >
-                  ✓ Yes, let&apos;s do it!
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onDeny}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 text-sm"
-                >
-                  ✗ No, let&apos;s adjust
-                </Button>
-              </div>
-            )}
-            
-            <div className={`text-xs text-gray-500 mt-1 ${isUser ? 'text-right' : 'text-left'}`}>
-              {message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-            </div>
-          </div>
+            {isUser ? 'You' : 'Tutor'}
+          </span>
         </div>
+        
+        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        
+        {isLoading && (
+          <div className="flex items-center space-x-2 mt-2">
+            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400"></div>
+            <span className="text-xs text-gray-400">Thinking...</span>
+          </div>
+        )}
+        
+        {isTyping && (
+          <div className="flex items-center space-x-2 mt-2">
+            <div className="flex space-x-1">
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            </div>
+            <span className="text-xs text-gray-400">Speaking...</span>
+          </div>
+        )}
+        
+        {showConfirmation && (
+          <div className="flex space-x-2 mt-3">
+            <Button
+              onClick={onConfirm}
+              className="flex-1 bg-green-500 hover:bg-green-600 text-white text-sm py-1 px-3 rounded"
+            >
+              Yes
+            </Button>
+            <Button
+              onClick={onDeny}
+              className="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm py-1 px-3 rounded"
+            >
+              No
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-// MessageInput component (keeping the same)
 const MessageInput = ({ 
   onSendMessage, 
   disabled, 
@@ -146,12 +133,11 @@ const MessageInput = ({
   isUserSpeaking: boolean;
 }) => {
   const [message, setMessage] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() && !disabled) {
-      onSendMessage(message.trim());
+      onSendMessage(message);
       setMessage('');
     }
   };
@@ -164,9 +150,7 @@ const MessageInput = ({
   };
 
   const handleVoiceToggle = () => {
-    if (isPaused) {
-      onResumeVoice();
-    } else if (isVoiceActive) {
+    if (isVoiceActive) {
       onEndVoice();
     } else {
       onStartVoice();
@@ -182,123 +166,100 @@ const MessageInput = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-3 p-4 bg-white border-t border-gray-200">
-      <div className="flex-1 relative">
+    <form onSubmit={handleSubmit} className="p-4">
+      <div className="flex items-center space-x-2">
         <input
-          ref={inputRef}
           type="text"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder={placeholder}
           disabled={disabled}
-          className="w-full px-4 py-3 pr-28 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
         
-        {(isVoiceActive || isPaused) && (
-          <button
-            type="button"
-            onClick={handlePauseToggle}
-            disabled={isVoiceLoading}
-            className={`absolute right-20 top-1/2 transform -translate-y-1/2 p-2 rounded-full transition-all duration-200 ${
-              isPaused 
-                ? 'bg-green-500 text-white hover:bg-green-600' 
-                : 'bg-yellow-500 text-white hover:bg-yellow-600'
-            } ${isVoiceLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-            title={isPaused ? 'Resume voice session' : 'Pause voice session'}
-          >
-            {isPaused ? (
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z"/>
-              </svg>
-            ) : (
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-              </svg>
-            )}
-          </button>
-        )}
-        
-        <button
+        <Button
           type="button"
           onClick={handleVoiceToggle}
           disabled={isVoiceLoading}
-          className={`absolute right-12 top-1/2 transform -translate-y-1/2 p-2 rounded-full transition-all duration-200 ${
-            isPaused
-              ? 'bg-orange-500 text-white hover:bg-orange-600'
-              : isVoiceActive 
-                ? 'bg-red-500 text-white hover:bg-red-600' 
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          } ${isVoiceLoading ? 'opacity-50 cursor-not-allowed' : ''} ${
-            isUserSpeaking ? 'animate-pulse' : ''
+          className={`p-2 rounded-lg transition-colors ${
+            isVoiceActive 
+              ? 'bg-red-500 hover:bg-red-600 text-white' 
+              : 'bg-green-500 hover:bg-green-600 text-white'
           }`}
-          title={
-            isPaused ? 'Resume voice session' : 
-            isVoiceActive ? 'Stop voice session' : 'Start voice session'
-          }
         >
-          {isVoiceLoading ? (
-            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-          ) : (
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-            </svg>
-          )}
-        </button>
+          {isVoiceLoading ? '⏳' : isVoiceActive ? '🔴' : '🎤'}
+        </Button>
         
-        <button
+        {isVoiceActive && (
+          <Button
+            type="button"
+            onClick={handlePauseToggle}
+            className={`p-2 rounded-lg transition-colors ${
+              isPaused 
+                ? 'bg-blue-500 hover:bg-blue-600 text-white' 
+                : 'bg-yellow-500 hover:bg-yellow-600 text-white'
+            }`}
+          >
+            {isPaused ? '▶️' : '⏸️'}
+          </Button>
+        )}
+        
+        <Button
           type="submit"
           disabled={!message.trim() || disabled}
-          className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-blue-500 hover:text-blue-600 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+          className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white p-2 rounded-lg transition-colors"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-          </svg>
-        </button>
+          Send
+        </Button>
       </div>
+      
+      {isUserSpeaking && (
+        <div className="mt-2 text-sm text-blue-600 flex items-center space-x-2">
+          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+          <span>Listening...</span>
+        </div>
+      )}
     </form>
   );
 };
 
-export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, TutorChatProps>(({ 
+export const TutorChat = forwardRef<{ resetChat: () => void }, TutorChatProps>(({ 
   question, 
   userCode, 
-  userPseudoCode,
-  onQuestionGenerated,
-  onSubmissionStateChange
+  userPseudoCode, 
+  onQuestionGenerated, 
+  onSubmissionStateChange 
 }, ref) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isProcessingProblem, setIsProcessingProblem] = useState(false);
   const [allMessages, setAllMessages] = useState<ChatBubbleMessage[]>([]);
-  const [showActions, setShowActions] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [confirmationMessageId, setConfirmationMessageId] = useState<string | null>(null);
+  const [pausedConversationHistory, setPausedConversationHistory] = useState<ChatBubbleMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { 
     startCall, 
     endCall, 
-    pauseCall,
+    pauseCall, 
     resumeCall,
-    injectContext, 
+    // injectContext, // Keep commented for future use
     isCallActive, 
-    isPaused,
-    isLoading: isVapiLoading, 
-    error: vapiError, 
+    isPaused, 
+    isLoading: isVoiceLoading,
+    error: voiceError,
     transcript,
-    fullConversation,
     conversationMessages,
-    pausedHistory,
     isSpeaking,
     isUserSpeaking
   } = useVapi();
 
-  useImperativeHandle(ref, () => ({
-    submitCode: (code: string) => {
-      handleCodeSubmission(code);
-    }
-  }));
+  // Use a ref to store the pauseCall function to avoid stale closure issues
+  const pauseCallRef = useRef(pauseCall);
+  useEffect(() => {
+    pauseCallRef.current = pauseCall;
+  }, [pauseCall]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -326,27 +287,32 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
     return confirmationPatterns.some(pattern => pattern.test(content));
   }, []);
 
-  // Handle auto-pause when confirmation is detected - separate from message processing
+  // Handle auto-pause when confirmation is detected - using ref to avoid dependency issues
   const handleConfirmationDetected = useCallback((messageId: string) => {
     if (!awaitingConfirmation) {
       console.log('Confirmation detected, setting up UI');
       setAwaitingConfirmation(true);
       setConfirmationMessageId(messageId);
       
-      // Auto-pause after a delay to avoid infinite loop
+      // Store the conversation history at pause time
+      setPausedConversationHistory(conversationMessages || []);
+      
+      // Auto-pause after a delay to avoid infinite loop - using ref
       if (isCallActive && !isPaused) {
         setTimeout(() => {
           console.log('Auto-pausing for confirmation');
-          pauseCall();
+          pauseCallRef.current();
         }, 1000);
       }
     }
-  }, [awaitingConfirmation, isCallActive, isPaused, pauseCall]);
+  }, [awaitingConfirmation, isCallActive, isPaused, conversationMessages]);
 
-  // Process messages - FIXED dependency array
+  // Process and combine messages
   useEffect(() => {
+    if (!conversationMessages && !messages.length) return;
+
     console.log('Processing messages:', { 
-      voiceMessages: conversationMessages.length, 
+      voiceMessages: conversationMessages?.length || 0, 
       textMessages: messages.length 
     });
 
@@ -392,52 +358,48 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
 
   const addMessage = (type: 'user' | 'tutor', content: string, questionData?: Question, needsConfirmation = false) => {
     const newMessage: Message = {
-      id: `text-${Date.now()}-${Math.random()}`,
+      id: Date.now().toString(),
       type,
       content,
       timestamp: new Date(),
       question: questionData,
       needsConfirmation
     };
-    console.log('Adding message:', newMessage);
+    
     setMessages(prev => [...prev, newMessage]);
   };
 
   const handleTextMessage = async (messageContent: string) => {
     if (!messageContent.trim()) return;
 
-    addMessage('user', messageContent);
     setIsLoading(true);
+    addMessage('user', messageContent);
 
     try {
-      const context = question ? {
-        title: question.title,
-        description: question.description,
-        userCode: userCode || '',
-        userPseudoCode: userPseudoCode || '',
-        difficulty: question.difficulty,
-        category: question.category
-      } : null;
-
       const response = await fetch('/api/tutor', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: messageContent,
-          context,
-          mode: 'problem_discussion'
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: messageContent, 
+          question: question?.title,
+          userCode,
+          userPseudoCode,
+          chatHistory: messages.map(msg => ({
+            role: msg.type === 'user' ? 'user' : 'assistant',
+            content: msg.content
+          }))
+        })
       });
 
-      const data = await response.json();
+      if (!response.ok) throw new Error('Failed to get response');
 
-      if (data.success) {
-        const needsConfirmation = checkIfNeedsConfirmation(data.data);
-        addMessage('tutor', data.data, undefined, needsConfirmation);
+      const data = await response.json();
+      
+      if (data.question) {
+        addMessage('tutor', data.response, data.question);
+        onQuestionGenerated?.(data.question);
       } else {
-        addMessage('tutor', 'Sorry, I encountered an error. Please try again.');
+        addMessage('tutor', data.response);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -447,59 +409,15 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
     }
   };
 
-  const handleCodeSubmission = async (code: string) => {
-    addMessage('user', `Please review my code:\n\n\`\`\`python\n${code}\n\`\`\``);
-    setIsLoading(true);
-
-    try {
-      const context = question ? {
-        title: question.title,
-        description: question.description,
-        userCode: code,
-        userPseudoCode: userPseudoCode || '',
-        difficulty: question.difficulty,
-        category: question.category
-      } : null;
-
-      const response = await fetch('/api/tutor', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: `Please review and provide feedback on my code solution for the problem "${question?.title}". Here's my code:\n\n${code}`,
-          context,
-          mode: 'review'
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        addMessage('tutor', data.data);
-      } else {
-        addMessage('tutor', 'Sorry, I encountered an error reviewing your code. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error submitting code to tutor:', error);
-      addMessage('tutor', 'Sorry, I encountered an error reviewing your code. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleStartVoice = () => {
-    console.log('Starting voice chat');
-    setAwaitingConfirmation(false);
-    setConfirmationMessageId(null);
+    const chatHistory = messages.map(msg => ({
+      id: msg.id,
+      type: msg.type,
+      content: msg.content,
+      timestamp: msg.timestamp
+    }));
     
-    startCall(question, userCode, userPseudoCode, messages);
-    
-    setTimeout(() => {
-      if (isCallActive) {
-        injectContext("Hi! I need a Python coding problem to practice. What do you suggest? Be concise and suggest something specific.");
-      }
-    }, 2000);
+    startCall(question, userCode, userPseudoCode, chatHistory);
   };
 
   const handleEndVoice = () => {
@@ -518,10 +436,10 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
     setAwaitingConfirmation(false);
     setConfirmationMessageId(null);
     
-    await createProblemFromConversation();
-    
-    if (isPaused) {
-      setTimeout(() => resumeCall(), 500);
+    // Use the paused conversation history for problem creation
+    const success = await createProblemFromConversation(true);
+    if (success) {
+      endCall();
     }
   };
 
@@ -529,246 +447,220 @@ export const TutorChat = forwardRef<{ submitCode: (code: string) => void }, Tuto
     setAwaitingConfirmation(false);
     setConfirmationMessageId(null);
     
-    addMessage('user', 'Let\'s try a different problem. What else do you suggest?');
-    
+    // Resume the conversation to continue discussing
     if (isPaused) {
-      setTimeout(() => resumeCall(), 500);
+      resumeCall();
     }
   };
 
   const createProblemFromConversation = async (usePausedHistory = false) => {
-    let conversationText = '';
+    const messagesToUse = usePausedHistory ? pausedConversationHistory : conversationMessages;
     
-    if (usePausedHistory && pausedHistory.length > 0) {
-      conversationText = pausedHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n\n');
-    } else if (fullConversation) {
-      conversationText = fullConversation;
-    } else if (allMessages.length > 0) {
-      conversationText = allMessages.map(msg => `${msg.role}: ${msg.content}`).join('\n\n');
-    }
-    
-    if (!conversationText) {
-      addMessage('tutor', 'No conversation to process yet. Start talking about what problem you want to work on!');
-      return;
+    if (!messagesToUse?.length) {
+      console.error('No conversation messages available');
+      return false;
     }
 
-    setIsProcessingProblem(true);
-    addMessage('user', 'Perfect! Create the problem for me.');
+    // Show immediate feedback to user
+    addMessage('tutor', 'Creating your coding problem...');
 
     try {
-      const response = await fetch('/api/tutor', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: `Based on this conversation about creating a Python problem, generate a structured coding problem:\n\n${conversationText}\n\nCreate a complete, well-structured coding problem with examples, constraints, and starter code. The user has confirmed they want to work on this problem.`,
-          context: null,
-          mode: 'generate'
-        }),
+      const conversationText = messagesToUse
+        .map(msg => `${msg.role}: ${msg.content}`)
+        .join('\n');
+
+      const contextMessage = usePausedHistory 
+        ? `Based on our conversation where we agreed on this problem, please create a Python coding problem. Here's our discussion:\n\n${conversationText}`
+        : `Based on our conversation, please create a Python coding problem. Here's our discussion:\n\n${conversationText}`;
+
+      console.log('Creating problem from conversation:', {
+        usePausedHistory,
+        messageCount: messagesToUse.length,
+        conversationText: conversationText.substring(0, 200) + '...'
       });
 
-      const data = await response.json();
+      const response = await fetch('/api/tutor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: contextMessage,
+          question: question?.title,
+          userCode,
+          userPseudoCode,
+          chatHistory: messages.map(msg => ({
+            role: msg.type === 'user' ? 'user' : 'assistant',
+            content: msg.content
+          })),
+          mode: 'generate'
+        })
+      });
 
-      if (data.success && !data.isText) {
-        const generatedQuestion: Question = {
-          id: Date.now(),
-          ...data.data
-        };
-        
-        if (onQuestionGenerated) {
-          onQuestionGenerated(generatedQuestion);
-        }
-        
-        addMessage('tutor', `Excellent! I've created the "${generatedQuestion.title}" problem and set it up in your editor. You can now start working on your pseudocode and implementation!`, generatedQuestion);
-        
-        if (isCallActive && !isPaused) {
-          setTimeout(() => {
-            injectContext(`Great! I've set up the "${generatedQuestion.title}" problem in the editor. You can start working on it now!`);
-          }, 1000);
-        }
-        
-      } else {
-        addMessage('tutor', 'I had trouble creating a structured problem from our conversation. Let\'s try describing the problem more clearly.');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
-    } catch (error) {
+
+      const data = await response.json();
+      
+      if (data.question) {
+        onQuestionGenerated?.(data.question);
+        
+        // Different message based on whether it's a fallback or not
+        const successMessage = data.fallback 
+          ? `✅ Problem created! (Generated a classic problem while AI service is busy)`
+          : `✅ Problem created: ${data.question.title}`;
+        
+        // Replace the "Creating..." message with success message
+        setMessages(prev => {
+          const newMessages = [...prev];
+          const lastMessage = newMessages[newMessages.length - 1];
+          if (lastMessage && lastMessage.content === 'Creating your coding problem...') {
+            lastMessage.content = successMessage;
+            if (data.question) {
+              lastMessage.question = data.question;
+            }
+          }
+          return newMessages;
+        });
+        
+        return true;
+      } else if (data.response) {
+        // Replace the "Creating..." message with the response
+        setMessages(prev => {
+          const newMessages = [...prev];
+          const lastMessage = newMessages[newMessages.length - 1];
+          if (lastMessage && lastMessage.content === 'Creating your coding problem...') {
+            lastMessage.content = data.response;
+          }
+          return newMessages;
+        });
+        return false;
+      } else {
+        throw new Error('No valid response received');
+      }
+    } catch (error: unknown) {
       console.error('Error creating problem:', error);
-      addMessage('tutor', 'Sorry, I encountered an error creating the problem. Please try again.');
-    } finally {
-      setIsProcessingProblem(false);
+      
+      let errorMessage = 'Sorry, I encountered an error creating the problem. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('overloaded')) {
+          errorMessage = 'The AI service is temporarily overloaded. Please try again in a moment.';
+        } else if (error.message.includes('HTTP 503')) {
+          errorMessage = 'Service temporarily unavailable. Please try again in a few seconds.';
+        }
+      }
+      
+      // Replace the "Creating..." message with error message
+      setMessages(prev => {
+        const newMessages = [...prev];
+        const lastMessage = newMessages[newMessages.length - 1];
+        if (lastMessage && lastMessage.content === 'Creating your coding problem...') {
+          lastMessage.content = errorMessage;
+        }
+        return newMessages;
+      });
+      
+      return false;
     }
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'Easy': return 'bg-green-100 text-green-800 border-green-300';
-      case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'Hard': return 'bg-red-100 text-red-800 border-red-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+  useImperativeHandle(ref, () => ({
+    resetChat: () => {
+      setMessages([]);
+      setAllMessages([]);
+      setAwaitingConfirmation(false);
+      setConfirmationMessageId(null);
+      setPausedConversationHistory([]);
+      if (isCallActive) {
+        endCall();
+      }
     }
-  };
+  }));
 
   const getVoiceStatus = () => {
-    if (awaitingConfirmation) return 'Awaiting your choice';
-    if (isPaused) return 'Voice paused';
-    if (isCallActive) return 'Voice active';
-    return 'Voice ready';
+    if (isVoiceLoading) return 'Connecting...';
+    if (isCallActive && !isPaused) return 'Voice Active';
+    if (isPaused) return 'Paused';
+    return 'Voice Inactive';
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-gray-50 rounded-lg border border-gray-200">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`w-3 h-3 rounded-full ${
-              awaitingConfirmation ? 'bg-yellow-500 animate-pulse' :
-              isPaused ? 'bg-orange-500' : 
-              isCallActive ? 'bg-green-500 animate-pulse' : 
-              'bg-gray-300'
-            }`}></div>
-            <div>
-              <h2 className="font-medium text-gray-900">AI Coding Tutor</h2>
-              <p className="text-sm text-gray-500">{getVoiceStatus()}</p>
-            </div>
+      <div className="p-4 border-b border-gray-200 bg-white rounded-t-lg">
+        <h2 className="text-lg font-semibold text-gray-800">Tutor Chat</h2>
+        <div className="flex items-center justify-between mt-2">
+          <div className="flex items-center space-x-2">
+            <div className={`w-2 h-2 rounded-full ${isCallActive ? 'bg-green-500' : 'bg-gray-400'}`} />
+            <span className="text-sm text-gray-600">{getVoiceStatus()}</span>
           </div>
-          
-          <div className="flex items-center gap-2">
-            {question && (
-              <>
-                <span className={`px-3 py-1 rounded text-sm font-medium border ${getDifficultyColor(question.difficulty)}`}>
-                  {question.difficulty}
-                </span>
-                <span className="text-sm text-gray-600 max-w-32 truncate">
-                  {question.title}
-                </span>
-              </>
-            )}
-            
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowActions(!showActions)}
-              className="ml-2 border-gray-300 text-gray-700 hover:bg-gray-50"
-            >
-              Actions
-            </Button>
-          </div>
+          {voiceError && (
+            <span className="text-sm text-red-600">Error: {voiceError}</span>
+          )}
         </div>
       </div>
 
-      {/* Confirmation Alert */}
-      {awaitingConfirmation && (
-        <div className="bg-yellow-50 border-b border-yellow-200 p-3">
-          <div className="flex items-center gap-2 text-yellow-800">
-            <span className="font-medium">⚡ Quick Decision:</span>
-            <span className="text-sm">Voice chat paused. Choose Yes or No below to continue.</span>
-          </div>
-        </div>
-      )}
-
-      {/* Debug info */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="bg-gray-50 border-b border-gray-200 p-2 text-xs">
-          <div>Messages: {allMessages.length} | Voice: {conversationMessages.length} | Text: {messages.length}</div>
-          <div>Awaiting: {awaitingConfirmation.toString()} | Confirmation ID: {confirmationMessageId}</div>
-          <div>Voice Active: {isCallActive.toString()} | Paused: {isPaused.toString()}</div>
-        </div>
-      )}
-
-      {/* Chat Container */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-1">
-        {allMessages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-500">
-            <div className="text-center">
-              <div className="text-4xl mb-4">🚀</div>
-              <p className="text-lg">Quick Python Problem Generator</p>
-              <p className="text-sm mt-2">Click the microphone for a brief, focused chat!</p>
-              <p className="text-xs mt-1 text-gray-400">I&apos;ll suggest a problem quickly and pause for your confirmation</p>
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {allMessages.map((message) => (
+          <ChatBubble
+            key={message.id}
+            message={message}
+            isLoading={isLoading && message === allMessages[allMessages.length - 1]}
+            isTyping={isSpeaking && message.isFromVoice}
+            showConfirmation={awaitingConfirmation && message.id === confirmationMessageId}
+            onConfirm={handleConfirmProblem}
+            onDeny={handleDenyProblem}
+          />
+        ))}
+        
+        {/* Loading message */}
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-blue-100 p-3 rounded-lg max-w-xs">
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                <span className="text-sm text-blue-700">Thinking...</span>
+              </div>
             </div>
           </div>
-        ) : (
-          <>
-            {allMessages.map((message) => (
-              <ChatBubble 
-                key={message.id} 
-                message={message} 
-                showConfirmation={awaitingConfirmation && confirmationMessageId === message.id}
-                onConfirm={handleConfirmProblem}
-                onDeny={handleDenyProblem}
-              />
-            ))}
-          </>
         )}
         
-        {/* Typing indicator */}
-        {(isSpeaking || isLoading) && !isPaused && !awaitingConfirmation && (
-          <ChatBubble 
-            message={{
-              id: 'typing-indicator',
-              role: 'assistant',
-              content: '',
-              timestamp: new Date()
-            }}
-            isTyping={true}
-          />
+        {/* Voice transcript preview */}
+        {transcript && isCallActive && (
+          <div className="bg-gray-100 p-3 rounded-lg border-l-4 border-blue-500">
+            <div className="flex items-center space-x-2 mb-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+              <span className="text-sm text-gray-600">Live Transcript</span>
+            </div>
+            <p className="text-gray-700">{transcript}</p>
+          </div>
         )}
         
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Voice Status */}
-      {(isCallActive || isPaused) && (transcript || isUserSpeaking) && !awaitingConfirmation && (
-        <div className={`border-t p-3 ${
-          isPaused ? 'bg-orange-50 border-orange-200' : 'bg-blue-50 border-blue-200'
-        }`}>
-          <div className="flex items-center gap-3">
-            <div className={`w-3 h-3 rounded-full ${
-              isPaused ? 'bg-orange-500' :
-              isUserSpeaking ? 'bg-red-500 animate-pulse' : 'bg-blue-500'
-            }`}></div>
-            <div className="flex-1">
-              <div className={`text-sm font-medium mb-1 ${
-                isPaused ? 'text-orange-700' : 'text-blue-700'
-              }`}>
-                {isPaused ? 'Voice paused' : 
-                 isUserSpeaking ? 'Speaking...' : 'Last said:'}
-              </div>
-              <div className={`text-sm ${
-                isPaused ? 'text-orange-800' : 'text-blue-800'
-              }`}>
-                {isPaused ? 'Waiting for your choice' : 
-                 transcript || 'Listening...'}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Error Display */}
-      {vapiError && (
-        <div className="bg-red-50 border-t border-red-200 p-3">
-          <div className="flex items-center gap-2 text-red-800">
-            <span className="font-medium">Error:</span>
-            <span className="text-sm">{vapiError}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Message Input */}
-      <MessageInput
-        onSendMessage={handleTextMessage}
-        disabled={isLoading}
-        placeholder="Type your message or click the microphone to discuss what Python problem you'd like to work on..."
-        onStartVoice={handleStartVoice}
-        onEndVoice={handleEndVoice}
-        onPauseVoice={handlePauseVoice}
-        onResumeVoice={handleResumeVoice}
-        isVoiceActive={isCallActive}
-        isPaused={isPaused}
-        isVoiceLoading={isVapiLoading}
-        isUserSpeaking={isUserSpeaking}
-      />
+      {/* Input */}
+      <div className="border-t border-gray-200 bg-white rounded-b-lg">
+        <MessageInput
+          onSendMessage={handleTextMessage}
+          disabled={isLoading}
+          placeholder={
+            awaitingConfirmation
+              ? "Please use the Yes/No buttons above to confirm the problem..."
+              : "Type your message or use voice..."
+          }
+          onStartVoice={handleStartVoice}
+          onEndVoice={handleEndVoice}
+          onPauseVoice={handlePauseVoice}
+          onResumeVoice={handleResumeVoice}
+          isVoiceActive={isCallActive}
+          isPaused={isPaused}
+          isVoiceLoading={isVoiceLoading}
+          isUserSpeaking={isUserSpeaking}
+        />
+      </div>
     </div>
   );
 });

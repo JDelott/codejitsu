@@ -87,6 +87,21 @@ export const DiagramEditor: React.FC<DiagramEditorProps> = ({
     }
   }, [resetTrigger, clearCanvas]);
 
+  // Helper function to get scaled mouse coordinates
+  const getScaledCoordinates = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    const x = (event.clientX - rect.left) * scaleX;
+    const y = (event.clientY - rect.top) * scaleY;
+
+    return { x, y };
+  }, []);
+
   const startDrawing = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
     if (mode !== 'draw') return;
     
@@ -94,14 +109,12 @@ export const DiagramEditor: React.FC<DiagramEditorProps> = ({
     const context = contextRef.current;
     if (!canvas || !context) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    const { x, y } = getScaledCoordinates(event);
 
     context.beginPath();
     context.moveTo(x, y);
     setIsDrawing(true);
-  }, [mode]);
+  }, [mode, getScaledCoordinates]);
 
   const draw = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing || mode !== 'draw') return;
@@ -110,13 +123,11 @@ export const DiagramEditor: React.FC<DiagramEditorProps> = ({
     const context = contextRef.current;
     if (!canvas || !context) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    const { x, y } = getScaledCoordinates(event);
 
     context.lineTo(x, y);
     context.stroke();
-  }, [isDrawing, mode]);
+  }, [isDrawing, mode, getScaledCoordinates]);
 
   const stopDrawing = useCallback(() => {
     if (!isDrawing) return;
@@ -209,8 +220,12 @@ export const DiagramEditor: React.FC<DiagramEditorProps> = ({
                   onMouseMove={draw}
                   onMouseUp={stopDrawing}
                   onMouseLeave={stopDrawing}
-                  className="cursor-crosshair border rounded"
-                  style={{ width: '100%', height: '160px' }}
+                  className="border rounded"
+                  style={{ 
+                    width: '100%', 
+                    height: '160px',
+                    cursor: 'crosshair'
+                  }}
                 />
               </div>
               <div className="flex items-center justify-between">

@@ -268,7 +268,16 @@ Editor is otherwise empty - ready to start planning and coding.`;
           problemTitle: question?.title || 'No current problem',
           problemDifficulty: question?.difficulty || 'To be determined',
           chatHistory: chatHistorySummary,
-          instructions: 'Be extremely concise and direct. Ask 1-2 questions max, then suggest a specific problem and ask "Should I create this problem for you?" Keep responses under 3 sentences.'
+          instructions: `Be extremely concise and direct. Ask 1-2 questions max, then suggest a specific problem and ask "Should I create this problem for you?" Keep responses under 3 sentences.
+
+IMPORTANT: I CAN create visual diagrams when users request them. When users say "draw me a diagram", "make me a diagram", "show me visually", or similar requests, I should acknowledge that I'm creating a diagram for them. I have the ability to generate SVG diagrams that will appear in their chat interface.
+
+When generating diagrams:
+- Acknowledge the request: "I'll create a diagram for you"
+- Briefly explain what the diagram will show
+- Confirm that the diagram is being generated
+
+Never say "I can't draw" or "I can't create diagrams" - I CAN create visual aids.`
         }
       };
       

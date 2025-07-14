@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { Question } from '@/types/question';
 import { CodeEditor } from './components/CodeEditor';
@@ -13,7 +13,11 @@ export default function Dashboard() {
   const [userCode, setUserCode] = useState('');
   const [userPseudoCode, setUserPseudoCode] = useState('');
   const [userDiagram, setUserDiagram] = useState('');
+  const [aiGeneratedDiagram, setAiGeneratedDiagram] = useState('');
   const [resetTrigger, setResetTrigger] = useState(0);
+  const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
+  
+  const tutorChatRef = useRef<{ resetChat: () => void; getChatContext: () => string } | null>(null);
 
   const handleQuestionGenerated = (question: Question) => {
     setSelectedQuestion(question);
@@ -32,16 +36,75 @@ export default function Dashboard() {
   };
 
   const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'Easy': return 'bg-green-100 text-green-800';
-      case 'Medium': return 'bg-yellow-100 text-yellow-800';
-      case 'Hard': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+    switch (difficulty.toLowerCase()) {
+      case 'easy': return 'text-green-600';
+      case 'medium': return 'text-yellow-600';
+      case 'hard': return 'text-red-600';
+      default: return 'text-gray-600';
     }
   };
 
   const handleReset = () => {
     setResetTrigger(prev => prev + 1);
+  };
+
+  const handleGenerateDiagram = async () => {
+    if (!selectedQuestion) {
+      alert('Please select a problem first');
+      return;
+    }
+
+    setIsGeneratingDiagram(true);
+    
+    try {
+      // Get comprehensive context from chat
+      const chatContext = tutorChatRef.current?.getChatContext() || '';
+      
+      // Build comprehensive context for better diagram generation
+      const requestData = {
+        problem: {
+          title: selectedQuestion.title,
+          description: selectedQuestion.description,
+          difficulty: selectedQuestion.difficulty,
+          category: selectedQuestion.category,
+          examples: selectedQuestion.examples || []
+        },
+        currentWork: {
+          code: userCode,
+          pseudoCode: userPseudoCode,
+          existingDiagram: userDiagram
+        },
+        conversationHistory: chatContext,
+        timestamp: new Date().toISOString()
+      };
+
+      console.log('Generating diagram with context:', requestData);
+
+      const response = await fetch('/api/generate-diagram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.svg) {
+        setAiGeneratedDiagram(data.svg);
+        console.log('✅ Diagram generated successfully');
+      } else {
+        console.error('❌ Diagram generation failed:', data.error);
+        throw new Error(data.error || 'No diagram generated');
+      }
+    } catch (error) {
+      console.error('Error generating diagram:', error);
+      alert('Failed to generate diagram. Please try again.');
+    } finally {
+      setIsGeneratingDiagram(false);
+    }
   };
 
   return (
@@ -72,54 +135,61 @@ export default function Dashboard() {
         
         {/* Right section - Action buttons */}
         <div className="flex items-center gap-3">
+          {/* Generate Diagram Button */}
           <Button
-            variant="outline"
-            size="sm"
-            onClick={handleReset}
+            onClick={handleGenerateDiagram}
+            disabled={!selectedQuestion || isGeneratingDiagram}
+            className="flex items-center gap-2 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
-            {selectedQuestion ? 'Reset' : 'Clear'}
+            {isGeneratingDiagram ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Generating...
+              </>
+            ) : (
+              <>
+                🎨 Generate Diagram
+              </>
+            )}
           </Button>
+
+          <Button onClick={handleReset} className="bg-gray-500 hover:bg-gray-600 text-white">
+            Reset
+          </Button>
+          
           <Button
-            size="sm"
-            variant={isChatOpen ? "primary" : "outline"}
             onClick={() => setIsChatOpen(!isChatOpen)}
+            className={`${isChatOpen ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
           >
-            {isChatOpen ? 'Hide Chat' : 'AI Tutor'}
+            {isChatOpen ? 'Close Chat' : 'Open Chat'}
           </Button>
         </div>
       </nav>
 
       <div className="flex h-[calc(100vh-73px)]">
-        {/* Main Content Area - Centered */}
-        <div className="flex-1 flex flex-col">
-          {/* Code Editor Container - Centered */}
-          <div className="flex-1 flex justify-center">
-            <div className="w-full max-w-5xl">
-              <CodeEditor 
-                question={selectedQuestion} 
-                onCodeChange={handleCodeChange}
-                onPseudoCodeChange={handlePseudoCodeChange}
-                onDiagramChange={handleDiagramChange}
-                resetTrigger={resetTrigger}
-              />
-            </div>
-          </div>
+        {/* Code Editor */}
+        <div className="flex-1">
+          <CodeEditor
+            question={selectedQuestion}
+            onCodeChange={handleCodeChange}
+            onPseudoCodeChange={handlePseudoCodeChange}
+            onDiagramChange={handleDiagramChange}
+            resetTrigger={resetTrigger}
+            aiGeneratedDiagram={aiGeneratedDiagram}
+          />
         </div>
 
-        {/* Collapsible Chat Panel */}
-        <div className={`transition-all duration-300 ease-in-out ${
-          isChatOpen ? 'w-96' : 'w-0'
-        } border-l border-gray-200 overflow-hidden`}>
+        {/* Chat Panel */}
+        <div className={`${isChatOpen ? 'w-1/3' : 'w-0'} transition-all duration-300 border-l border-gray-200`}>
           {isChatOpen && (
-            <div className="w-96 h-full">
-              <TutorChat
-                question={selectedQuestion}
-                userCode={userCode}
-                userPseudoCode={userPseudoCode}
-                userDiagram={userDiagram}
-                onQuestionGenerated={handleQuestionGenerated}
-              />
-            </div>
+            <TutorChat
+              ref={tutorChatRef}
+              question={selectedQuestion}
+              userCode={userCode}
+              userPseudoCode={userPseudoCode}
+              userDiagram={userDiagram}
+              onQuestionGenerated={handleQuestionGenerated}
+            />
           )}
         </div>
       </div>

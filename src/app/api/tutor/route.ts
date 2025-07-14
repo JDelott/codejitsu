@@ -32,6 +32,22 @@ function extractJSON(text: string): Record<string, unknown> | null {
   }
 }
 
+// Helper function to extract SVG from text response
+function extractSVG(text: string): string | null {
+  const svgMatch = text.match(/```svg\s*([\s\S]*?)\s*```/);
+  if (svgMatch) {
+    return svgMatch[1].trim();
+  }
+  
+  // Also try to find SVG without code blocks
+  const directSvgMatch = text.match(/<svg[\s\S]*?<\/svg>/);
+  if (directSvgMatch) {
+    return directSvgMatch[0];
+  }
+  
+  return null;
+}
+
 // Fallback problem generator when API is overloaded
 function generateFallbackProblem(conversationContext: string):unknown {
   // Extract key information from conversation
@@ -228,7 +244,60 @@ This diagram shows the user's visual approach to solving the problem.`;
         
       default:
         systemPrompt = `You are a helpful coding tutor. Assist the user with their coding questions while being encouraging and educational.
-        
+
+        CRITICAL: When users ask for diagrams, visual aids, or want you to "draw", "show", or "diagram" something, you MUST create actual SVG diagrams. Do NOT explain how to create them - CREATE them immediately.
+
+        **ALWAYS create SVG diagrams when user says:**
+        - "diagram this"
+        - "draw this" 
+        - "show me visually"
+        - "create a visual aid"
+        - "I want you to diagram"
+        - Any request for visual representation
+
+        **SVG Creation Rules:**
+        - Wrap ALL SVG code in \`\`\`svg code blocks
+        - Use viewBox="0 0 400 300" 
+        - Colors: #2563eb (blue), #dc2626 (red), #16a34a (green), #374151 (gray)
+        - Font: Arial, sans-serif, 12-14px
+        - Diamond shapes for decisions, rectangles for actions
+        - Clear, simple layouts
+
+        **Example FizzBuzz Flowchart:**
+        \`\`\`svg
+        <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">
+          <text x="200" y="20" text-anchor="middle" font-family="Arial" font-size="14" fill="#374151">FizzBuzz Decision Flow</text>
+          <rect x="150" y="40" width="100" height="30" fill="#e5e7eb" stroke="#374151" stroke-width="2"/>
+          <text x="200" y="60" text-anchor="middle" font-family="Arial" font-size="12" fill="#374151">Start (i=1 to n)</text>
+          <polygon points="170,90 230,90 250,110 230,130 170,130 150,110" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+          <text x="200" y="115" text-anchor="middle" font-family="Arial" font-size="10" fill="#374151">i % 15 == 0?</text>
+          <rect x="280" y="95" width="80" height="30" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+          <text x="320" y="115" text-anchor="middle" font-family="Arial" font-size="10" fill="#374151">Print "FizzBuzz"</text>
+          <polygon points="170,150 230,150 250,170 230,190 170,190 150,170" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+          <text x="200" y="175" text-anchor="middle" font-family="Arial" font-size="10" fill="#374151">i % 3 == 0?</text>
+          <rect x="280" y="155" width="60" height="30" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+          <text x="310" y="175" text-anchor="middle" font-family="Arial" font-size="10" fill="#374151">Print "Fizz"</text>
+          <polygon points="170,210 230,210 250,230 230,250 170,250 150,230" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+          <text x="200" y="235" text-anchor="middle" font-family="Arial" font-size="10" fill="#374151">i % 5 == 0?</text>
+          <rect x="280" y="215" width="60" height="30" fill="#fecaca" stroke="#dc2626" stroke-width="2"/>
+          <text x="310" y="235" text-anchor="middle" font-family="Arial" font-size="10" fill="#374151">Print "Buzz"</text>
+          <rect x="50" y="215" width="60" height="30" fill="#f3f4f6" stroke="#374151" stroke-width="2"/>
+          <text x="80" y="235" text-anchor="middle" font-family="Arial" font-size="10" fill="#374151">Print i</text>
+          <line x1="250" y1="110" x2="280" y2="110" stroke="#374151" stroke-width="1"/>
+          <text x="265" y="108" font-family="Arial" font-size="10" fill="#16a34a">Yes</text>
+          <line x1="200" y1="130" x2="200" y2="150" stroke="#374151" stroke-width="1"/>
+          <text x="205" y="145" font-family="Arial" font-size="10" fill="#dc2626">No</text>
+          <line x1="250" y1="170" x2="280" y2="170" stroke="#374151" stroke-width="1"/>
+          <text x="265" y="168" font-family="Arial" font-size="10" fill="#2563eb">Yes</text>
+          <line x1="200" y1="190" x2="200" y2="210" stroke="#374151" stroke-width="1"/>
+          <text x="205" y="205" font-family="Arial" font-size="10" fill="#dc2626">No</text>
+          <line x1="250" y1="230" x2="280" y2="230" stroke="#374151" stroke-width="1"/>
+          <text x="265" y="228" font-family="Arial" font-size="10" fill="#dc2626">Yes</text>
+          <line x1="150" y1="230" x2="110" y2="230" stroke="#374151" stroke-width="1"/>
+          <text x="120" y="228" font-family="Arial" font-size="10" fill="#374151">No</text>
+        </svg>
+        \`\`\`
+
         Context: ${JSON.stringify(contextData)}
         
         ${userDiagram ? describeDiagramForAI(userDiagram) : ''}`;
@@ -330,9 +399,13 @@ This diagram shows the user's visual approach to solving the problem.`;
       }
     }
 
+    // Extract SVG content if present
+    const svgContent = extractSVG(responseText);
+
     return NextResponse.json({ 
       success: true,
-      response: responseText
+      response: responseText,
+      svg: svgContent
     });
 
   } catch (error: unknown) {

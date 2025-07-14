@@ -11,6 +11,7 @@ interface CodeEditorProps {
   onDiagramChange?: (diagram: string) => void;
   onCodeSubmit?: (code: string) => void;
   resetTrigger?: number;
+  aiGeneratedDiagram?: string; // New prop for AI-generated diagrams
 }
 
 export const CodeEditor: React.FC<CodeEditorProps> = ({ 
@@ -18,7 +19,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onCodeChange, 
   onPseudoCodeChange,
   onDiagramChange,
-  resetTrigger
+  resetTrigger,
+  aiGeneratedDiagram
 }) => {
   const [pseudoCode, setPseudoCode] = useState('');
   const [pythonCode, setPythonCode] = useState('# Write your Python code here\n\n');
@@ -181,6 +183,19 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                     ))}
                   </div>
                 </details>
+              )}
+
+              {/* AI Generated Diagram */}
+              {aiGeneratedDiagram && (
+                <div className="mb-4">
+                  <h3 className="text-md font-semibold text-gray-900 mb-2">AI-Generated Diagram</h3>
+                  <div className="bg-white p-3 rounded border border-gray-200">
+                    <div 
+                      className="flex justify-center"
+                      dangerouslySetInnerHTML={{ __html: aiGeneratedDiagram }}
+                    />
+                  </div>
+                </div>
               )}
 
               {/* Diagram Editor */}

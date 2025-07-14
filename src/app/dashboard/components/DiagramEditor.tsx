@@ -5,16 +5,19 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 interface DiagramEditorProps {
   onDiagramChange?: (diagramData: string) => void;
   resetTrigger?: number;
+  aiGeneratedDiagram?: string; // New prop for AI-generated diagrams
 }
 
-type DrawingMode = 'draw' | 'text';
+type DrawingMode = 'draw' | 'text' | 'svg' | 'ai'; // Add 'ai' mode
 
 export const DiagramEditor: React.FC<DiagramEditorProps> = ({ 
   onDiagramChange,
-  resetTrigger 
+  resetTrigger,
+  aiGeneratedDiagram
 }) => {
   const [mode, setMode] = useState<DrawingMode>('draw');
   const [textContent, setTextContent] = useState('');
+  const [svgContent, setSvgContent] = useState('<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">\n  <!-- Your SVG content here -->\n  <rect x="50" y="50" width="100" height="60" fill="#e5e7eb" stroke="#374151" stroke-width="2"/>\n  <text x="100" y="85" text-anchor="middle" font-family="Arial" font-size="14" fill="#374151">Example</text>\n</svg>');
   const [isDrawing, setIsDrawing] = useState(false);
   const [isDiagramCollapsed, setIsDiagramCollapsed] = useState(false);
   
@@ -57,12 +60,23 @@ export const DiagramEditor: React.FC<DiagramEditorProps> = ({
       if (dataURL) {
         onDiagramChange?.(dataURL);
       }
-    } else {
+    } else if (mode === 'text') {
       // For text mode, encode text as base64
       const textData = `data:text/plain;base64,${btoa(textContent)}`;
       onDiagramChange?.(textData);
+    } else if (mode === 'svg') {
+      // For SVG mode, encode SVG as base64
+      const svgData = `data:image/svg+xml;base64,${btoa(svgContent)}`;
+      onDiagramChange?.(svgData);
     }
-  }, [mode, textContent, getCanvasDataURL, onDiagramChange]);
+  }, [mode, textContent, svgContent, getCanvasDataURL, onDiagramChange]);
+
+  // Switch to AI mode when AI diagram is generated
+  useEffect(() => {
+    if (aiGeneratedDiagram && aiGeneratedDiagram.trim()) {
+      setMode('ai');
+    }
+  }, [aiGeneratedDiagram]);
 
   const clearCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -79,11 +93,12 @@ export const DiagramEditor: React.FC<DiagramEditorProps> = ({
     }
   }, [getCanvasDataURL, onDiagramChange]);
 
-  // Handle reset trigger - moved after clearCanvas declaration
+  // Handle reset trigger
   useEffect(() => {
     if (resetTrigger && resetTrigger > 0) {
       clearCanvas();
       setTextContent('');
+      setSvgContent('<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">\n  <!-- Your SVG content here -->\n  <rect x="50" y="50" width="100" height="60" fill="#e5e7eb" stroke="#374151" stroke-width="2"/>\n  <text x="100" y="85" text-anchor="middle" font-family="Arial" font-size="14" fill="#374151">Example</text>\n</svg>');
     }
   }, [resetTrigger, clearCanvas]);
 
@@ -149,11 +164,17 @@ export const DiagramEditor: React.FC<DiagramEditorProps> = ({
     setTextContent(event.target.value);
   };
 
+  const handleSvgChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setSvgContent(event.target.value);
+  };
+
   const handleClearAll = () => {
     if (mode === 'draw') {
       clearCanvas();
-    } else {
+    } else if (mode === 'text') {
       setTextContent('');
+    } else if (mode === 'svg') {
+      setSvgContent('<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">\n  <!-- Your SVG content here -->\n  <rect x="50" y="50" width="100" height="60" fill="#e5e7eb" stroke="#374151" stroke-width="2"/>\n  <text x="100" y="85" text-anchor="middle" font-family="Arial" font-size="14" fill="#374151">Example</text>\n</svg>');
     }
   };
 
@@ -180,7 +201,7 @@ export const DiagramEditor: React.FC<DiagramEditorProps> = ({
           <h3 className="text-md font-semibold text-gray-900">Diagram</h3>
         </div>
         <div className="text-xs text-gray-500">
-          Visualize your solution
+          {mode === 'ai' ? 'AI-generated diagram' : 'Visualize your solution'}
         </div>
       </div>
 
@@ -208,9 +229,31 @@ export const DiagramEditor: React.FC<DiagramEditorProps> = ({
             >
               📝 Text
             </button>
+            <button
+              onClick={() => setMode('svg')}
+              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                mode === 'svg'
+                  ? 'bg-purple-500 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              🎨 SVG
+            </button>
+            {aiGeneratedDiagram && (
+              <button
+                onClick={() => setMode('ai')}
+                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                  mode === 'ai'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                🤖 AI
+              </button>
+            )}
           </div>
 
-          {/* Drawing area */}
+          {/* Content area */}
           {mode === 'draw' ? (
             <div className="space-y-2">
               <div className="border border-gray-300 rounded-lg p-2 bg-white">
@@ -240,7 +283,7 @@ export const DiagramEditor: React.FC<DiagramEditorProps> = ({
                 </button>
               </div>
             </div>
-          ) : (
+          ) : mode === 'text' ? (
             <div className="space-y-2">
               <textarea
                 value={textContent}
@@ -274,7 +317,65 @@ Examples:
                 </button>
               </div>
             </div>
-          )}
+          ) : mode === 'svg' ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">SVG Code</h4>
+                  <textarea
+                    value={svgContent}
+                    onChange={handleSvgChange}
+                    className="w-full h-40 p-3 border border-gray-300 rounded-lg font-[family-name:var(--font-geist-mono)] text-xs resize-none focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 shadow-sm bg-purple-50/50"
+                    placeholder="Enter SVG code here..."
+                    spellCheck={false}
+                  />
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Preview</h4>
+                  <div className="w-full h-40 p-3 border border-gray-300 rounded-lg bg-white flex items-center justify-center">
+                    <div 
+                      className="max-w-full max-h-full"
+                      dangerouslySetInnerHTML={{ __html: svgContent }}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-500">
+                  {svgContent.split('\n').length} lines • {svgContent.length} chars
+                </div>
+                <button
+                  onClick={handleClearAll}
+                  className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          ) : mode === 'ai' ? (
+            <div className="space-y-2">
+              <div className="w-full p-3 border border-gray-300 rounded-lg bg-white">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">AI-Generated Diagram</h4>
+                <div className="flex justify-center">
+                  <div 
+                    className="max-w-full"
+                    dangerouslySetInnerHTML={{ __html: aiGeneratedDiagram || '' }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-500">
+                  Generated by voice assistant
+                </div>
+                <button
+                  onClick={() => setMode('draw')}
+                  className="text-sm text-blue-500 hover:text-blue-700 transition-colors"
+                >
+                  Switch to manual editing
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </div>

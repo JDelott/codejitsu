@@ -48,6 +48,32 @@ const ChatBubble = ({
 }) => {
   const isUser = message.role === 'user';
   
+  // Function to extract and render SVG from message content
+  const renderMessageContent = (content: string) => {
+    const svgMatch = content.match(/```svg\s*([\s\S]*?)\s*```/);
+    
+    if (svgMatch) {
+      const svgContent = svgMatch[1].trim();
+      const textBefore = content.substring(0, svgMatch.index);
+      const textAfter = content.substring(svgMatch.index! + svgMatch[0].length);
+      
+      return (
+        <div>
+          {textBefore && <p className="text-sm whitespace-pre-wrap mb-3">{textBefore}</p>}
+          <div className="bg-white p-3 rounded border border-gray-200 my-3">
+            <div 
+              className="flex justify-center"
+              dangerouslySetInnerHTML={{ __html: svgContent }}
+            />
+          </div>
+          {textAfter && <p className="text-sm whitespace-pre-wrap mt-3">{textAfter}</p>}
+        </div>
+      );
+    }
+    
+    return <p className="text-sm whitespace-pre-wrap">{content}</p>;
+  };
+  
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
@@ -66,7 +92,7 @@ const ChatBubble = ({
           </span>
         </div>
         
-        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        {renderMessageContent(message.content)}
         
         {isLoading && (
           <div className="flex items-center space-x-2 mt-2">
@@ -245,12 +271,15 @@ const MessageInput = ({
   );
 };
 
-export const TutorChat = forwardRef<{ resetChat: () => void }, TutorChatProps>(({ 
+export const TutorChat = forwardRef<{ 
+  resetChat: () => void;
+  getChatContext: () => string;
+}, TutorChatProps>(({ 
   question, 
   userCode, 
   userPseudoCode, 
   userDiagram,
-  onQuestionGenerated 
+  onQuestionGenerated
 }, ref) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -320,7 +349,37 @@ export const TutorChat = forwardRef<{ resetChat: () => void }, TutorChatProps>((
     }
   }, [awaitingConfirmation, isCallActive, isPaused, conversationMessages]);
 
-  // Process and combine messages
+  // Enhanced chat context for diagram generation
+  const getChatContext = useCallback(() => {
+    const allConversation = [...allMessages].sort((a, b) => 
+      new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()
+    );
+    
+    // Format conversation with timestamps and better structure
+    const formattedConversation = allConversation
+      .map(msg => {
+        const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : 'Unknown';
+        const speaker = msg.role === 'user' ? 'Student' : 'Tutor';
+        const source = msg.isFromVoice ? '🎤' : '💬';
+        
+        return `[${timestamp}] ${source} ${speaker}: ${msg.content}`;
+      })
+      .join('\n\n');
+    
+    // Add summary if conversation is long
+    if (formattedConversation.length > 2000) {
+      const recentMessages = allConversation.slice(-10);
+      const recentFormatted = recentMessages
+        .map(msg => `${msg.role === 'user' ? 'Student' : 'Tutor'}: ${msg.content}`)
+        .join('\n\n');
+      
+      return `**Recent Conversation (last 10 messages):**\n${recentFormatted}\n\n**Total messages in conversation:** ${allConversation.length}`;
+    }
+    
+    return formattedConversation || 'No conversation history available';
+  }, [allMessages]);
+
+  // Process and combine messages (simplified - no diagram detection)
   useEffect(() => {
     if (!conversationMessages && !messages.length) return;
 
@@ -410,15 +469,19 @@ export const TutorChat = forwardRef<{ resetChat: () => void }, TutorChatProps>((
 
       const data = await response.json();
       
+      // If there's SVG content, embed it in the response
+      let responseContent = data.response;
+      if (data.svg) {
+        responseContent = `${data.response}\n\n\`\`\`svg\n${data.svg}\n\`\`\``;
+      }
+      
       if (data.question) {
-        // Check if the response needs confirmation
-        const needsConfirmation = checkIfNeedsConfirmation(data.response);
-        addMessage('tutor', data.response, data.question, needsConfirmation);
+        const needsConfirmation = checkIfNeedsConfirmation(responseContent);
+        addMessage('tutor', responseContent, data.question, needsConfirmation);
         onQuestionGenerated?.(data.question);
       } else {
-        // Check if the response needs confirmation
-        const needsConfirmation = checkIfNeedsConfirmation(data.response);
-        addMessage('tutor', data.response, undefined, needsConfirmation);
+        const needsConfirmation = checkIfNeedsConfirmation(responseContent);
+        addMessage('tutor', responseContent, undefined, needsConfirmation);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -557,7 +620,8 @@ export const TutorChat = forwardRef<{ resetChat: () => void }, TutorChatProps>((
       if (isCallActive) {
         endCall();
       }
-    }
+    },
+    getChatContext
   }));
 
   const getVoiceStatus = () => {
